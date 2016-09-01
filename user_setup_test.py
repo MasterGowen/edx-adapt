@@ -1,14 +1,12 @@
 import json, sys, requests
-host = sys.argv[1]
-user = sys.argv[2]
+
+from config import EDX, EDXADAPT
+
+user = sys.argv[1]
 headers = {'Content-type': 'application/json'}
 
-
-
-
-
 payload = json.dumps({'user_id':user})
-r = requests.post('http://'+host+':9000/api/v1/course/CMUSTAT101/user', data=payload, headers=headers)
+r = requests.post('http://{HOST}:{PORT}/api/v1/course/{COURSE_ID}/user'.format(**EDXADAPT), data=payload, headers=headers)
 print str(r) + str(r.json())
 
 # give some problems
@@ -16,7 +14,7 @@ p = {'pg': 0.25, 'ps': 0.25, 'pi': 0.1, 'pt': 0.5, 'threshold':0.99}
 skills = ['center', 'shape', 'spread', 'x axis', 'y axis', 'h to d', 'd to h', 'histogram', 'None']
 
 for skill in skills:
-    payload = json.dumps({'course_id':'CMUSTAT101', 'params': p, 'user_id':user, 'skill_name':skill})
-    r = requests.post('http://'+host+':9000/api/v1/parameters', data=payload, headers=headers)
+    payload = json.dumps({'course_id':EDXADAPT['COURSE_ID'], 'params': p, 'user_id':user, 'skill_name':skill})
+    r = requests.post('http://{HOST}:{PORT}/api/v1/parameters'.format(**EDXADAPT), data=payload, headers=headers)
     print str(r) + str(r.json())
 

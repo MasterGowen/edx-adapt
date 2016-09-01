@@ -1,0 +1,10 @@
+boto
+cma
+flask
+flask-cors
+flask_restful
+hmmlearn
+requests
+sklearn
+sqlitedict
+tinydb
