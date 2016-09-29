@@ -16,6 +16,7 @@ import edx_adapt.select.skill_separate_random_selector as select
 import edx_adapt.model.bkt as bkt
 
 app = Flask(__name__)
+app.debug = False
 CORS(app)
 api = Api(app)
 
@@ -92,6 +93,12 @@ api.add_resource(ER.DataExport, base+'/misc/dataexport',
 @app.errorhandler(404)  # Return JSON with 404 instead of html
 def page_not_found(e):
     return flask.jsonify(error=404, text=str(e)), 404
+
+
+@app.before_request
+def log_request_info():
+    #app.logger.debug('Headers: %s', flask.request.headers)
+    app.logger.debug('Body: %s', flask.request.get_data())
 
 
 def run():
