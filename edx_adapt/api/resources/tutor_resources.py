@@ -67,7 +67,9 @@ class UserProblems(Resource):
                 # then filter out this user, because they are not paying
                 # attention and simply clicking buttons
                 pretest_done = len(self.repo.get_all_remaining_pretest_problems(course_id, user_id)) == 0
-                if pretest_done and (sum( [x['correct'] for x in answers if (x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME) ] ) < 1):
+                # Disable cut off of students who gave no correct answers at pre-assessment for easier debugging
+                # if pretest_done and (sum( [x['correct'] for x in answers if (x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME) ] ) < 1):
+                if pretest_done and (sum( [x['correct'] for x in answers if (x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME) ] ) < 0):
                     done_with_course = True
                     nex = None
 
