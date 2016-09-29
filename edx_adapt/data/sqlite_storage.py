@@ -62,6 +62,12 @@ class SqliteStorage(interface.StorageInterface):
         #TODO: do
         raise NotImplementedError("Storage module must implement this")
 
+    def export(self, tables=None):
+        r = {}
+        for table_name, table in self.tables.items():
+            r[table_name] = dict(table)
+        return r
+
     def _assert_no_table(self, table_name):
         if table_name in self.table_names['tables']:
             raise interface.DataException("Table already exists: {}".format(table_name))

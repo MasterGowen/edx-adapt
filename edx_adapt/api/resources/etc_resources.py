@@ -234,3 +234,11 @@ class LoopRunner(Resource):
         # not getting anything, just asking for another loop to start
         edx_adapt.misc.psiturk_with_bo.set_next_users_parameters(self.repo, self.selector, course_id)
         return {'message': 'starting...'}, 200
+
+class DataExport(Resource):
+    def __init__(self, **kwargs):
+        self.repo = kwargs['data']
+        self.selector = kwargs['selector']
+
+    def get(self, tables=None):
+        return self.repo.store.export(tables)

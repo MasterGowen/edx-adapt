@@ -85,6 +85,8 @@ api.add_resource(ER.BORunner, base+'/misc/RunBO/course/<course_id>',
                  resource_class_kwargs={'data': database, 'selector': selector})
 api.add_resource(ER.HitExtendNoBO, base+'/misc/hitextend',
                  resource_class_kwargs={'data': database, 'selector': selector})
+api.add_resource(ER.DataExport, base+'/misc/dataexport',
+                 resource_class_kwargs={'data': database, 'selector': selector})
 
 
 @app.errorhandler(404)  # Return JSON with 404 instead of html
