@@ -12,6 +12,7 @@ import resources.etc_resources as ER
 import edx_adapt.data.course_repository as repo
 import edx_adapt.data.tinydb_storage as store
 import edx_adapt.data.sqlite_storage as sqlitestore
+import edx_adapt.data.mongodb_storage as mongodbstore
 import edx_adapt.select.skill_separate_random_selector as select
 import edx_adapt.model.bkt as bkt
 
@@ -20,11 +21,13 @@ app.debug = False
 CORS(app)
 api = Api(app)
 
+
 # TODO: load from settings
 base = '/api/v1'
 
-#database = repo.CourseRepository(store.TinydbStorage('/tmp/2.json'))
-database = repo.CourseRepository(sqlitestore.SqliteStorage('/tmp/edx_adapt.db'))
+#database = repo.CourseRepository(store.TinydbStorage('/tmp/edx_adapt.json'))
+# database = repo.CourseRepository(sqlitestore.SqliteStorage('/tmp/edx_adapt.db'))
+database = repo.CourseRepository(mongodbstore.MongoDbStorage('mongodb://localhost:27017/'))
 student_model = bkt.BKT()
 selector = select.SkillSeparateRandomSelector(database, student_model, "user skill")
 
