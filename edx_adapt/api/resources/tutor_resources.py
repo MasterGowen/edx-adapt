@@ -103,7 +103,7 @@ def run_selector(course_id, user_id, selector, repo):
     with selector_lock:
         """@type selector: SelectInterface"""
         """@type repo: DataInterface"""
-        print("--------------------\tSELECTOR LOCK ACQUIRED!")
+        # print("--------------------\tSELECTOR LOCK ACQUIRED!")
         nex = None
         try:
             nex = repo.get_next_problem(course_id, user_id)
@@ -114,10 +114,10 @@ def run_selector(course_id, user_id, selector, repo):
         # only run if no next problem has been selected yet, or there was an error previously
         if nex is None or 'error' in nex:
             try:
-                print("--------------------\tSELECTOR CHOOSING NEXT PROBLEM")
+                # print("--------------------\tSELECTOR CHOOSING NEXT PROBLEM")
                 prob = selector.choose_next_problem(course_id, user_id)
-                print("--------------------\tFINISHED CHOOSING NEXT PROBLEM: ")
-                print("--------------------\t" + str(prob))
+                # print("--------------------\tFINISHED CHOOSING NEXT PROBLEM: ")
+                # print("--------------------\t" + str(prob))
                 repo.set_next_problem(course_id, user_id, prob)
             except SelectException as e:
                 # assume that the user/course exists. Set an error...
@@ -132,8 +132,10 @@ def run_selector(course_id, user_id, selector, repo):
             print("--------------------\tSELECTION NOT REQUIRED!")
 
 
-""" Post a user's response to their current problem """
 class UserInteraction(Resource):
+    """
+    Post a user's response to their current problem.
+    """
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
         self.selector = kwargs['selector']
@@ -144,7 +146,6 @@ class UserInteraction(Resource):
         args = result_parser.parse_args()
         if args['unix_seconds'] is None:
             args['unix_seconds'] = int(time.time())
-
         try:
             # If this is a response to the "next" problem, advance to it first before storing
             # (shouldn't happen if PageLoad messages are posted correctly, but we won't require that)
@@ -167,19 +168,19 @@ class UserInteraction(Resource):
 
             # the user needs a new problem, start choosing one
             try:
-                print("--------------------\tSTARTING SELECTOR!")
+                # print("--------------------\tSTARTING SELECTOR!")
                 """t = threading.Thread(target=run_selector, args=(course_id, user_id, self.selector, self.repo))
                 t.start()
                 t.join()
                 #TODO: actually run in other thread """
                 run_selector(course_id, user_id, self.selector, self.repo)
             except Exception as e:
-                print("--------------------\tEXCEPTION STARTING SELECTION THREAD: " + str(e))
+                # print("--------------------\tEXCEPTION STARTING SELECTION THREAD: " + str(e))
                 abort(500, message="Interaction successfully stored, but an error occurred starting "
                                    "a problem selection thread: " + e.message)
 
         except DataException as e:
-            print("--------------------\tDATA EXCEPTION: " + str(e))
+            # print("--------------------\tDATA EXCEPTION: " + str(e))
             abort(500, message=e.message)
 
         return {"success": True}, 200

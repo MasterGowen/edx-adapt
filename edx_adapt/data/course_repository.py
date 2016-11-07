@@ -24,7 +24,7 @@ class CourseRepository(interface.DataInterface):
             pass
 
         """ Course setup methods """
-    def post_course(self, course_id):
+    def post_course(self, course_id, *args):
         self.store.create_table(course_id)
         self.store.set(course_id, 'users_in_progress', [])
         self.store.set(course_id, 'users_finished', [])
@@ -60,7 +60,7 @@ class CourseRepository(interface.DataInterface):
     """ Retrieve course information """
     def get_course_ids(self):
         courses = self.store.get_tables()
-        courses.remove('_default')
+        # courses.remove('_default')
         courses.remove(self.generic_table_name)
         return list(courses)
 
@@ -248,13 +248,13 @@ class CourseRepository(interface.DataInterface):
     access to persistent storage
     """
     def set(self, key, value):
-        print("--------------------\tGENERIC DB_SET GOING DOWN!")
-        print("--------------------\tKEY: " + str(key))
-        print("--------------------\tVAL: " + str(value))
+        # print("--------------------\tGENERIC DB_SET GOING DOWN!")
+        # print("--------------------\tKEY: " + str(key))
+        # print("--------------------\tVAL: " + str(value))
         self.store.set(self.generic_table_name, key, value)
-        print("--------------------\tGENERIC DB_SET DONE!")
+        # print("--------------------\tGENERIC DB_SET DONE!")
     def get(self, key):
-        print("--------------------\tGENERIC DB_GET GRABBING: " + str(key))
+        # print("--------------------\tGENERIC DB_GET GRABBING: " + str(key))
         return self.store.get(self.generic_table_name, key)
 
     def _get_user_log_key(self, user_id):
@@ -270,8 +270,8 @@ class CourseRepository(interface.DataInterface):
             raise interface.DataException("Problem not found: {}".format(problem_name))
 
         random.shuffle(problem) #hack because joe is tired. shouldn't be multiple problems here anyway
-        print "!~@!@!!$!@#$!@#!!!!!!!!!!!!!!!!!"
-        print problem
+        # print "!~@!@!!$!@#$!@#!!!!!!!!!!!!!!!!!"
+        # print problem
 
         pret = problem[0]
         if problem_d is not None:

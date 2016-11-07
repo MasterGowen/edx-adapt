@@ -125,8 +125,8 @@ class Problems(Resource):
 
     def post(self, course_id):
         args = problem_parser.parse_args()
-        print "Post problem args:"
-        print args
+        # print "Post problem args:"
+        # print args
         try:
             if args['pretest']:
                 self.repo.post_pretest_problem(course_id, args['skills'], args['problem_name'], args['tutor_url'])
