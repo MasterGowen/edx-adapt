@@ -4,6 +4,7 @@ from interface import SelectInterface, SelectException
 from edx_adapt.data.interface import DataException
 from edx_adapt.model.interface import ModelException
 
+
 class SkillSeparateRandomSelector(SelectInterface):
     """ This is an implementation of the adaptive problem selector.
     At each time point, to goes through every skill (can be 1 skill)
@@ -14,11 +15,12 @@ class SkillSeparateRandomSelector(SelectInterface):
     the candidate list with the same probability.
     """
 
-    parameter_access_mode_list = ["course"] # List of the granularity of parameters
-                                    # (If per course, "course"; if per skill, "skill"; if per user, "user")
+    # List of the granularity of parameters
+    # (If per course, "course"; if per skill, "skill"; if per user, "user")
+    parameter_access_mode_list = ["course"]
     valid_mode_list = ["course", "user", "skill"]
 
-    def __init__(self, data_interface, model_interface, parameter_access_mode = ""):
+    def __init__(self, data_interface, model_interface, parameter_access_mode=""):
         """
         Constructor with the running mode specified, where running mode specifies
         whether the parameters are specified per course, per user, per skill, etc.
@@ -43,7 +45,6 @@ class SkillSeparateRandomSelector(SelectInterface):
         for mode in self.parameter_access_mode_list:
             if mode not in self.valid_mode_list:
                 raise SelectException("Parameter access mode is invalid")
-
 
     def get_p_list(self, namelist, course, user):
         probs = self.data_interface.get_problems(course)
@@ -70,7 +71,6 @@ class SkillSeparateRandomSelector(SelectInterface):
                 new_prob_list.append(prob)
         return new_prob_list
 
-
     def choose_next_problem(self, course_id, user_id):
         """
         Choose the next problem to give to the user
@@ -84,7 +84,7 @@ class SkillSeparateRandomSelector(SelectInterface):
             pretest_problems = self.data_interface.get_all_remaining_pretest_problems(course_id, user_id)
             if len(pretest_problems) > 0:
                 for id in range(14):
-                    prob = 'Pre_assessment_'+str(id)
+                    prob = 'Pre_assessment_{}'.format(id)
                     for pre_prob in pretest_problems:
                         if pre_prob['problem_name'] == prob:
                             return pre_prob
@@ -92,7 +92,7 @@ class SkillSeparateRandomSelector(SelectInterface):
                 #return sorted(pretest_problems, key=lambda k: k['problem_name'])[0]
 
             #Do the first 3 baseline problems (if model says to)
-            for prob in self.get_p_list(['b3','b4','b3_2_0'], course_id, user_id):
+            for prob in self.get_p_list(['b3', 'b4', 'b3_2_0'], course_id, user_id):
                 return prob
             #Do the next 2 problems always
             p_done = self.data_interface.get_all_interactions(course_id, user_id)
@@ -108,7 +108,8 @@ class SkillSeparateRandomSelector(SelectInterface):
                         return ret[0]
 
             #if the user has started the post-test, finish it
-            if len( [x for x in self.data_interface.get_all_interactions(course_id, user_id) if x['problem']['posttest']]) > 0:
+            if len([x for x in self.data_interface.get_all_interactions(course_id, user_id)
+                    if x['problem']['posttest']]) > 0:
                 post = self.data_interface.get_all_remaining_posttest_problems(course_id, user_id)
                 if len(post) > 0:
                     for id in range(14):
@@ -150,7 +151,6 @@ class SkillSeparateRandomSelector(SelectInterface):
         except SelectException as e:
             raise e
 
-
     def choose_first_problem(self, course_id, user_id):
         """
         Choose the first problem to give to the user
@@ -164,7 +164,6 @@ class SkillSeparateRandomSelector(SelectInterface):
             if prob['problem_name'] == 'Pre_assessment_0':
                 return prob
         #return sorted(pretest, key=lambda k: k['problem_name'])[0]
-
 
     def _get_key(self, course_id, user_id, skill_name):
         """
@@ -184,7 +183,6 @@ class SkillSeparateRandomSelector(SelectInterface):
             else:
                 raise SelectException("Parameter access mode is invalid")
         return key.strip()
-
 
     def get_parameter(self, course_id, user_id = None, skill_name = None):
         mode_id_map = {"course": course_id, "user": user_id, "skill": skill_name}

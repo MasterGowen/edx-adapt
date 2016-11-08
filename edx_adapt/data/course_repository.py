@@ -101,7 +101,7 @@ class CourseRepository(interface.DataInterface):
 
         old_attempt = [x for x in self.get_raw_user_data(course_id, user_id)
                        if x['problem']['problem_name'] == problem_name and x['type'] == 'response'
-                          and x['attempt'] == attempt]
+                       and x['attempt'] == attempt]
 
         if len(old_attempt) > 0:
             # don't record the same attempt twice

@@ -21,22 +21,51 @@ def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 
-class EdxAdaptTestCase(unittest.TestCase):
-    def setUp(self):
-        self.course_id = COURSE_ID + id_generator(3)
-        course_setup_test.prepare_course(self.course_id)
+class BaseTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.skills = ['center', 'shape', 'spread', 'x axis', 'y axis', 'h to d', 'd to h', 'histogram', 'None']
+        cls.course_id = COURSE_ID + id_generator(3)
+        course_setup_test.prepare_course(cls.course_id)
 
-        self.headers = {'Content-type': 'application/json'}
-        self.app = adapt_api.app.test_client()
+        cls.headers = {'Content-type': 'application/json'}
+        cls.app = adapt_api.app.test_client()
 
-    def tearDown(self):
+    @classmethod
+    def tearDownClass(cls):
         # FIXME(idegtiarov) TearDown method is now implemented only for MongoDB, SQLite should be added
         import pymongo
         mclient = pymongo.MongoClient()['edx-adapt']
-        mclient.drop_collection(self.course_id)
+        mclient.drop_collection(cls.course_id)
         regex = re.compile('_student_')
         mclient.Generic.remove({'key': {'$regex': regex}})
+        
+    def _answer_pre_assessment_problems(self, correct=None):
+        pre_assessments = ['Pre_assessment_{}'.format(i) for i in range(0, 14)]
+        for i, problem in enumerate(pre_assessments):
+            data = {'problem': problem, 'correct': (True if correct and i < correct else False), 'attempt': 1}
+            self.app.post(
+                base + '/{}/user/{}/interaction'.format(self.course_id, self.student_name),
+                data=json.dumps(data), headers=self.headers
+            )
 
+    def _answer_next_problem(self, correct=True, attempt=1, repeat=1):
+        for i in range(repeat):
+            data = {'problem': adapt_api.database.get_next_problem(self.course_id, self.student_name), 'correct': correct,
+                    'attempt': attempt}
+            self.app.post(
+                base + '/{}/user/{}/interaction'.format(self.course_id, self.student_name),
+                data=json.dumps(data), headers=self.headers
+            )
+
+    def _add_probabilities_to_user_kill(self, probabilities):
+        for skill in self.skills:
+            payload = json.dumps({'course_id': self.course_id, 'params': probabilities,
+                                  'user_id': self.student_name, 'skill_name': skill})
+            self.app.post('/api/v1/parameters', data=payload, headers=self.headers)
+
+
+class CourseTestCase(BaseTestCase):
     def test_course_created(self):
         res = json.loads(self.app.get(base).data)
         self.assertEqual(self.course_id, res['course_ids'][0])
@@ -61,41 +90,33 @@ class EdxAdaptTestCase(unittest.TestCase):
         self.assertEqual(expected, experiments['experiments'])
 
 
-class AllCorrectPreAssessmentTestCase(EdxAdaptTestCase):
+class PreAssessmentTestCase(BaseTestCase):
     def setUp(self):
-        super(AllCorrectPreAssessmentTestCase, self).setUp()
+        # super(PreAssessmentTestCase, self).setUp()
         # set up new student
         self.student_name = 'test_student_' + id_generator()
 
-        self.app.post('/api/v1/course/{}/user'.format(self.course_id),
+        self.app.post(base + '/{}/user'.format(self.course_id),
                       data=json.dumps({'user_id': self.student_name}), headers=self.headers)
         # Default student params
-        self.probabilities = {'pg': 0.25, 'ps': 0.25, 'pi': 0.1, 'pt': 0.5, 'threshold': 0.99}
-        skills = ['center', 'shape', 'spread', 'x axis', 'y axis', 'h to d', 'd to h', 'histogram', 'None']
+        probabilities = {'pg': 0.25, 'ps': 0.25, 'pi': 0.1, 'pt': 0.5, 'threshold': 0.99}
 
-        for skill in skills:
-            payload = json.dumps({'course_id': COURSE_ID, 'params': self.probabilities, 'user_id': self.student_name,
-                                  'skill_name': skill})
-            self.app.post('/api/v1/parameters', data=payload, headers=self.headers)
+        self._add_probabilities_to_user_kill(probabilities)
 
-    def test_user_enrolled(self):
+    def test_student_enrolled(self):
         user = json.loads(self.app.get(base + '/{}/user'.format(self.course_id)).data)['users']['in_progress']
         self.assertTrue(user, msg="There is no any user enrolled on the course")
-        self.assertEqual(1, len(user))
-        self.assertEqual(self.student_name, user[0])
+        self.assertGreaterEqual(len(user), 1)
+        self.assertEqual(self.student_name, user[-1])
 
     def test_student_cut_off_after_all_correct_answers(self):
-        pre_assessments = ['Pre_assessment_{}'.format(i) for i in range(0, 13)]
-        for problem in pre_assessments:
-            data = {'problem': problem, 'correct': True, 'attempt': 1}
-            self.app.post(
-                base + '/{}/user/{}/interaction'.format(self.course_id, self.student_name),
-                data=json.dumps(data), headers=self.headers
-            )
+        self._answer_pre_assessment_problems(correct=7)
 
         status = json.loads(self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
         self.assertEqual(True, status['done_with_course'])
 
+    def test_student_cut_off_after_all_incorrect_answers(self):
+        self._answer_pre_assessment_problems(correct=0)
 
-if __name__ == '__main__':
-    unittest.main()
+        status = json.loads(self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
+        self.assertEqual(True, status['done_with_course'])

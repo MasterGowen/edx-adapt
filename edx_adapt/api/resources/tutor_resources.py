@@ -12,8 +12,12 @@ from edx_adapt.select.interface import SelectException
 
 from edx_adapt.misc import psiturk_with_bo
 
-""" Handle request for user's current and next problem """
+
+
 class UserProblems(Resource):
+    """
+    Handle request for user's current and next problem
+    """
     # Name of the question to test whether the user is paying attention on pretest.
     ATTENTION_QUESTION_NAME = 'Pre_assessment_13'
 
@@ -44,7 +48,7 @@ class UserProblems(Resource):
                 log = self.repo.get_raw_user_data(course_id, user_id)
                 current_correct = [x for x in log if x['type'] == 'response' and
                                    x['problem']['problem_name'] == cur['problem_name'] and x['correct'] == 1]
-                done_with_current = ( len(current_correct) > 0)
+                done_with_current = (len(current_correct) > 0)
 
                 #account for test questions: user is "done" after they input any answer
                 if cur["pretest"] or cur["posttest"]:
@@ -59,26 +63,29 @@ class UserProblems(Resource):
                 # then the user knows too much already (ATTENTION_QUESTION_NAME
                 # is only for checking that the user is paying attention,
                 # not knowledge assessment, so skip it)
+                # FIXME(idegtirov) threshold for pre_assessment problems should be changed from int to percentage
                 answers = self.repo.get_all_interactions(course_id, user_id)
-                if sum( [x['correct'] for x in answers if (x['problem']['pretest'] and x['problem']['problem_name'] != UserProblems.ATTENTION_QUESTION_NAME) ] ) > 7:
+                if sum([x['correct'] for x in answers if
+                        (x['problem']['pretest'] and
+                            x['problem']['problem_name'] != UserProblems.ATTENTION_QUESTION_NAME)]) > 7:
                     done_with_course = True
                     nex = None
                 # if answer to ATTENTION_QUESTION_NAME is wrong -
                 # then filter out this user, because they are not paying
                 # attention and simply clicking buttons
                 pretest_done = len(self.repo.get_all_remaining_pretest_problems(course_id, user_id)) == 0
-                # Disable cut off of students who gave no correct answers at pre-assessment for easier debugging
-                # if pretest_done and (sum( [x['correct'] for x in answers if (x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME) ] ) < 1):
-                if pretest_done and (sum( [x['correct'] for x in answers if (x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME) ] ) < 0):
+                if pretest_done and (
+                    sum([x['correct'] for x in answers if
+                        (x['problem']['pretest'] and
+                            x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME)]) < 1):
                     done_with_course = True
                     nex = None
-
-
             except DataException as e:
                 print("--------------------\tDATA EXCEPTION: " + str(e))
                 abort(500, message=str(e))
 
-        return {"next": nex, "current": cur, "done_with_current": done_with_current, "okay": okay, "done_with_course": done_with_course}
+        return {"next": nex, "current": cur, "done_with_current": done_with_current, "okay": okay,
+                "done_with_course": done_with_course}
 
 
 """ Argument parser for posting a user response """
@@ -98,11 +105,14 @@ result_parser.add_argument('unix_seconds', type=int, location='json',
 """ Global lock for calling choose_next_problem """
 selector_lock = threading.Lock()
 
-""" Run the problem selection sequence (in separate thread) """
+
 def run_selector(course_id, user_id, selector, repo):
+    """
+    Run the problem selection sequence (in separate thread)
+    """
     with selector_lock:
-        """@type selector: SelectInterface"""
-        """@type repo: DataInterface"""
+        """@type selector: SelectInterface
+        @type repo: DataInterface"""
         # print("--------------------\tSELECTOR LOCK ACQUIRED!")
         nex = None
         try:
@@ -190,8 +200,11 @@ load_parser.add_argument('problem', required=True, help="Must supply the name of
 load_parser.add_argument('unix_seconds', type=int, help="Optionally supply timestamp in seconds since unix epoch",
                          location='json')
 
-""" Post the time when a user loads a problem. Used to log time spent solving a problem """
+
 class UserPageLoad(Resource):
+    """
+    Post the time when a user loads a problem. Used to log time spent solving a problem.
+    """
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
         """@type repo: DataInterface"""
