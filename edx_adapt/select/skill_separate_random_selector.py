@@ -65,7 +65,7 @@ class SkillSeparateRandomSelector(SelectInterface):
                 self.data_interface.get_skill_trajectory(course, skill, user), # trajectory of correctness
                 skill_parameter # parameters for the skill
             )
-            print "threshold",skill_parameter['threshold'],'prob mastery',prob_mastery
+            print "threshold", skill_parameter['threshold'], 'prob mastery', prob_mastery
             # If the probability is less than threshold, add the problems to candidate list
             if prob_mastery < skill_parameter['threshold']:
                 new_prob_list.append(prob)
@@ -184,7 +184,7 @@ class SkillSeparateRandomSelector(SelectInterface):
                 raise SelectException("Parameter access mode is invalid")
         return key.strip()
 
-    def get_parameter(self, course_id, user_id = None, skill_name = None):
+    def get_parameter(self, course_id, user_id=None, skill_name=None):
         mode_id_map = {"course": course_id, "user": user_id, "skill": skill_name}
 
         key = ""

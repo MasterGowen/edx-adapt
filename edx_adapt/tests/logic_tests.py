@@ -1,16 +1,12 @@
-import os
-
-from edx_adapt.api import adapt_api
-import course_setup_test
-
-import unittest
-import tempfile
 import json
-
-import re
-
-import string
 import random
+import re
+import string
+import unittest
+
+import course_setup_test
+from edx_adapt.api import adapt_api
+
 
 COURSE_ID = 'CMUSTAT'
 
@@ -39,11 +35,21 @@ class BaseTestCase(unittest.TestCase):
         mclient.drop_collection(cls.course_id)
         regex = re.compile('_student_')
         mclient.Generic.remove({'key': {'$regex': regex}})
-        
-    def _answer_pre_assessment_problems(self, correct=None):
+
+    def _answer_pre_assessment_problems(self, correct=0, attention_question=True):
+        """
+        Automation fulfilling Pre-Assessment problems
+
+        :param correct: int, Number of correct answers
+        :param attention_question: bool, by default one of correct answers id assigned to AttentionQuestion
+        """
         pre_assessments = ['Pre_assessment_{}'.format(i) for i in range(0, 14)]
         for i, problem in enumerate(pre_assessments):
-            data = {'problem': problem, 'correct': (True if correct and i < correct else False), 'attempt': 1}
+            if correct:
+                correct_value = True if i < correct - attention_question or (attention_question and i == 13) else False
+            else:
+                correct_value = False
+            data = {'problem': problem, 'correct': correct_value, 'attempt': 1}
             self.app.post(
                 base + '/{}/user/{}/interaction'.format(self.course_id, self.student_name),
                 data=json.dumps(data), headers=self.headers
@@ -51,8 +57,8 @@ class BaseTestCase(unittest.TestCase):
 
     def _answer_next_problem(self, correct=True, attempt=1, repeat=1):
         for i in range(repeat):
-            data = {'problem': adapt_api.database.get_next_problem(self.course_id, self.student_name), 'correct': correct,
-                    'attempt': attempt}
+            data = {'problem': adapt_api.database.get_next_problem(self.course_id, self.student_name)['problem_name'],
+                    'correct': correct, 'attempt': attempt}
             self.app.post(
                 base + '/{}/user/{}/interaction'.format(self.course_id, self.student_name),
                 data=json.dumps(data), headers=self.headers
@@ -110,13 +116,45 @@ class PreAssessmentTestCase(BaseTestCase):
         self.assertEqual(self.student_name, user[-1])
 
     def test_student_cut_off_after_all_correct_answers(self):
-        self._answer_pre_assessment_problems(correct=7)
+
+        self._answer_pre_assessment_problems(correct=7, attention_question=False)
 
         status = json.loads(self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
         self.assertEqual(True, status['done_with_course'])
 
     def test_student_cut_off_after_all_incorrect_answers(self):
         self._answer_pre_assessment_problems(correct=0)
-
         status = json.loads(self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
         self.assertEqual(True, status['done_with_course'])
+
+
+class MainLogicTestCase(BaseTestCase):
+    def setUp(self):
+        self.student_name = 'test_student_' + id_generator()
+        self.app.post(base + '/{}/user'.format(self.course_id),
+                      data=json.dumps({'user_id': self.student_name}), headers=self.headers)
+
+    def test_alternative_parameters_set_one(self):
+        probabilities = {'pg': 0.01, 'ps': 0.01, 'pi': 0.99, 'pt': 0.99, 'threshold': 0.90}
+        self._add_probabilities_to_user_kill(probabilities)
+        self._answer_pre_assessment_problems(correct=5)
+        self._answer_next_problem(repeat=3)
+        next_problem = json.loads(
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+        self.assertTrue(next_problem['posttest'])
+        self.assertTrue(next_problem['problem_name'].startswith('Post_assessment'))
+
+    def test_alternative_parameters_set_two(self):
+        probabilities = {'pg': 0.5, 'ps': 0.5, 'pi': 0.01, 'pt': 0.01, 'threshold': 0.95}
+        self._add_probabilities_to_user_kill(probabilities)
+        self._answer_pre_assessment_problems(correct=5)
+        # NOTE(idegtiarov) we should go through almost all skills problems and see that in next there is not posttest
+        # one. We have 14 Pre tests and 14 Post test problems
+        given_answer = (
+            len(adapt_api.database.get_problems(self.course_id)) - 14 - 14 - 1)
+        for _ in range(given_answer):
+            self._answer_next_problem()
+            next_problem = json.loads(
+                self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+            self.assertFalse(next_problem['posttest'])
+            self.assertFalse(next_problem['problem_name'].startswith('Post_assessment'))
