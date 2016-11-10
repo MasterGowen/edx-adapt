@@ -13,7 +13,6 @@ from edx_adapt.select.interface import SelectException
 from edx_adapt.misc import psiturk_with_bo
 
 
-
 class UserProblems(Resource):
     """
     Handle request for user's current and next problem

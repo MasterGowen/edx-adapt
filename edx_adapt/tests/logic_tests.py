@@ -4,9 +4,10 @@ import re
 import string
 import unittest
 
+import pymongo
+
 import course_setup_test
 from edx_adapt.api import adapt_api
-
 
 COURSE_ID = 'CMUSTAT'
 
@@ -29,8 +30,7 @@ class BaseTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # FIXME(idegtiarov) TearDown method is now implemented only for MongoDB, SQLite should be added
-        import pymongo
+        # NOTE(idegtiarov) sqlite is too slow for using on server we will support only MongoDB
         mclient = pymongo.MongoClient()['edx-adapt']
         mclient.drop_collection(cls.course_id)
         regex = re.compile('_student_')
@@ -55,14 +55,25 @@ class BaseTestCase(unittest.TestCase):
                 data=json.dumps(data), headers=self.headers
             )
 
-    def _answer_next_problem(self, correct=True, attempt=1, repeat=1):
+    def _answer_problem(self, correct=True, attempt=1, repeat=1, next_problem=True):
+        """
+        Make an answer on Course's problem
+        :param correct: bool, correct or not
+        :param attempt: int, which attempt
+        :param repeat: int, how many times student answer
+        :param next_problem: boolean, answer on next problem True by default, if False student answer on current problem
+        """
         for i in range(repeat):
-            data = {'problem': adapt_api.database.get_next_problem(self.course_id, self.student_name)['problem_name'],
-                    'correct': correct, 'attempt': attempt}
+            if next_problem:
+                problem = adapt_api.database.get_next_problem(self.course_id, self.student_name)
+            else:
+                problem = adapt_api.database.get_current_problem(self.course_id, self.student_name)
+            data = {'problem': problem['problem_name'], 'correct': correct, 'attempt': attempt}
             self.app.post(
                 base + '/{}/user/{}/interaction'.format(self.course_id, self.student_name),
                 data=json.dumps(data), headers=self.headers
             )
+            attempt += 0 if next_problem else 1
 
     def _add_probabilities_to_user_kill(self, probabilities):
         for skill in self.skills:
@@ -138,7 +149,7 @@ class MainLogicTestCase(BaseTestCase):
         probabilities = {'pg': 0.01, 'ps': 0.01, 'pi': 0.99, 'pt': 0.99, 'threshold': 0.90}
         self._add_probabilities_to_user_kill(probabilities)
         self._answer_pre_assessment_problems(correct=5)
-        self._answer_next_problem(repeat=3)
+        self._answer_problem(repeat=3)
         next_problem = json.loads(
             self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
         self.assertTrue(next_problem['posttest'])
@@ -153,8 +164,72 @@ class MainLogicTestCase(BaseTestCase):
         given_answer = (
             len(adapt_api.database.get_problems(self.course_id)) - 14 - 14 - 1)
         for _ in range(given_answer):
-            self._answer_next_problem()
+            self._answer_problem()
             next_problem = json.loads(
                 self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
             self.assertFalse(next_problem['posttest'])
             self.assertFalse(next_problem['problem_name'].startswith('Post_assessment'))
+
+    def test_default_parameter_set(self):
+        """
+        Test default user parameter set
+
+        Workflow could have different problems sequence that propose to student to solve, if almost all answers are
+        correct student will have to answer not more than 28 problems with two answers from second attempt from 56
+        before switching to post assessment part
+        """
+        probabilities = {'pg': 0.25, 'ps': 0.25, 'pi': 0.1, 'pt': 0.5, 'threshold': 0.99}
+        self._add_probabilities_to_user_kill(probabilities)
+        self._answer_pre_assessment_problems(correct=5)
+        next_problem = json.loads(
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+        self.assertEqual('b3', next_problem['problem_name'])
+
+        self._answer_problem()
+        next_problem = json.loads(
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+        self.assertEqual('b4', next_problem['problem_name'])
+
+        self._answer_problem()
+        next_problem = json.loads(
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+        self.assertEqual('b3_2_0', next_problem['problem_name'])
+
+        self._answer_problem()
+        next_problem = json.loads(
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+        self.assertEqual('labels_we', next_problem['problem_name'])
+
+        self._answer_problem()
+        next_problem = json.loads(
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+        self.assertEqual('skew_easy_0', next_problem['problem_name'])
+
+        self._answer_problem()
+        # next_problem = json.loads(
+        #     self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+
+        self._answer_problem(correct=False)
+        status = json.loads(
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
+        self.assertFalse(status['done_with_current'])
+        self._answer_problem(attempt=2, next_problem=False)
+        status = json.loads(
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
+        self.assertTrue(status['done_with_current'])
+
+        self._answer_problem(repeat=3)
+
+        self._answer_problem(correct=False)
+        status = json.loads(
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
+        self.assertFalse(status['done_with_current'])
+        self._answer_problem(attempt=2, next_problem=False)
+        status = json.loads(
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
+        self.assertTrue(status['done_with_current'])
+
+        self._answer_problem(repeat=17)
+        status = json.loads(
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
+        self.assertTrue(status['next']['posttest'])

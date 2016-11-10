@@ -61,7 +61,8 @@ api.add_resource(DR.UserTrajectoryRequest, base + '/data/trajectory/course/<cour
                  resource_class_kwargs={'data': database, 'selector': selector})
 api.add_resource(DR.CourseTrajectoryRequest, base + '/data/trajectory/course/<course_id>',
                  resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(DR.ExperimentTrajectoryRequest, base + '/data/trajectory/course/<course_id>/experiment/<experiment_name>',
+api.add_resource(DR.ExperimentTrajectoryRequest,
+                 base + '/data/trajectory/course/<course_id>/experiment/<experiment_name>',
                  resource_class_kwargs={'data': database, 'selector': selector})
 
 api.add_resource(MR.Parameters, base+'/parameters',

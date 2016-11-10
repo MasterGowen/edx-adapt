@@ -5,6 +5,7 @@ flask-cors
 flask_restful
 hmmlearn
 requests
+pymongo
 sklearn
 sqlitedict
 tinydb
