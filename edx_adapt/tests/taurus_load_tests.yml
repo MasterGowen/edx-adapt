@@ -1,0 +1,67 @@
+# Taurus load testing config file
+# How to use it:
+# 0. Make sure you have java installed
+# 1. pip install bzt <- install it
+# 2. bzt taurus_load_tests.yml <- run it
+
+---
+execution:
+- scenario: login-and-open-problem
+  concurrency: 100
+  iterations: 3
+  ramp-up: 2m
+  hold-for: 7m
+
+
+scenarios:
+  login-and-open-problem:
+    # This scenario simulates following steps:
+    # 1. User logs into edx
+    # 2. User goes to problem page
+    think-time: 50ms
+    retrieve-resources: false
+    store-cookie: true
+    requests:
+    # login to open edx
+      - url: http://52.50.241.19/login
+        extract-regexp:
+          csrf_token:
+            regexp: csrftoken=(\w*);
+            subject: headers
+      - url: http://52.50.241.19/user_api/v1/account/login_session/
+        method: POST
+        headers:
+          X-CSRFToken: ${csrf_token}
+        body:
+          email: student21@raccoongang.com
+          password: p21
+    # navigate to problem page
+      - http://52.50.241.19/courses/course-v1:CMU+STAT101+2014_T1/info
+      - http://52.50.241.19/courses/course-v1:CMU+STAT101+2014_T1/courseware/statistics/
+    # load problem page and fetch all additional resources
+      - http://52.50.241.19/courses/course-v1:CMU+STAT101+2014_T1/courseware/statistics/T3/
+      - url: http://52.50.241.19/courses/course-v1:CMU+STAT101+2014_T1/xblock/block-v1:CMU+STAT101+2014_T1+type@problem+block@T3:t3/handler/xmodule_handler/problem_get
+        method: POST
+        headers:
+          X-CSRFToken: ${csrf_token}
+      - url: http://52.50.241.19/dashboard
+      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
+      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
+      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
+      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
+      - url: http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21/pageload
+        method: OPTIONS
+      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
+      - url: http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21/pageload
+        method: POST
+        headers:
+          Content-Type: application/json
+        body: '{"problem": "T3"}'  # post JSON
+      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
+      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
+
+
+reporting:
+- module: final_stats
+  dump-csv: taurus_load_tests_report.csv
+- module: console
