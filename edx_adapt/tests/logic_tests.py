@@ -109,7 +109,6 @@ class CourseTestCase(BaseTestCase):
 
 class PreAssessmentTestCase(BaseTestCase):
     def setUp(self):
-        # super(PreAssessmentTestCase, self).setUp()
         # set up new student
         self.student_name = 'test_student_' + id_generator()
 
@@ -206,8 +205,6 @@ class MainLogicTestCase(BaseTestCase):
         self.assertEqual('skew_easy_0', next_problem['problem_name'])
 
         self._answer_problem()
-        # next_problem = json.loads(
-        #     self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
 
         self._answer_problem(correct=False)
         status = json.loads(
