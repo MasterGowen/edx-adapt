@@ -107,9 +107,10 @@ class SkillSeparateRandomSelector(SelectInterface):
                     if len(ret) > 0:
                         return ret[0]
 
-            #if the user has started the post-test, finish it
-            if len([x for x in self.data_interface.get_all_interactions(course_id, user_id)
-                    if x['problem']['posttest']]) > 0:
+            # if the user has started the post-test, finish it
+            if len(
+                [x for x in self.data_interface.get_all_interactions(course_id, user_id) if x['problem']['posttest']]
+            ) > 0:
                 post = self.data_interface.get_all_remaining_posttest_problems(course_id, user_id)
                 if len(post) > 0:
                     for id in range(14):

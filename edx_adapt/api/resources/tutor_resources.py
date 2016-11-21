@@ -15,7 +15,7 @@ from edx_adapt.misc import psiturk_with_bo
 
 class UserProblems(Resource):
     """
-    Handle request for user's current and next problem
+    Handle request for user's current and next problem.
     """
     # Name of the question to test whether the user is paying attention on pretest.
     ATTENTION_QUESTION_NAME = 'Pre_assessment_13'
@@ -49,7 +49,7 @@ class UserProblems(Resource):
                                    x['problem']['problem_name'] == cur['problem_name'] and x['correct'] == 1]
                 done_with_current = (len(current_correct) > 0)
 
-                #account for test questions: user is "done" after they input any answer
+                # account for test questions: user is "done" after they input any answer
                 if cur["pretest"] or cur["posttest"]:
                     if len([x for x in log if x['type'] == 'response']) > 0:
                         done_with_current = True
@@ -57,16 +57,18 @@ class UserProblems(Resource):
                 fin = self.repo.get_finished_users(course_id)
                 if user_id in fin:
                     done_with_course = True
-                #reject high pretest scores
+                # reject high pretest scores
                 # if more than 7 out of the first 13 pretest questions are correct -
                 # then the user knows too much already (ATTENTION_QUESTION_NAME
                 # is only for checking that the user is paying attention,
                 # not knowledge assessment, so skip it)
                 # FIXME(idegtirov) threshold for pre_assessment problems should be changed from int to percentage
                 answers = self.repo.get_all_interactions(course_id, user_id)
-                if sum([x['correct'] for x in answers if
-                        (x['problem']['pretest'] and
-                            x['problem']['problem_name'] != UserProblems.ATTENTION_QUESTION_NAME)]) > 7:
+                if sum([
+                    x['correct'] for x in answers if (
+                        x['problem']['pretest'] and x['problem']['problem_name'] != UserProblems.ATTENTION_QUESTION_NAME
+                    )
+                ]) > 7:
                     done_with_course = True
                     nex = None
                 # if answer to ATTENTION_QUESTION_NAME is wrong -
@@ -74,17 +76,20 @@ class UserProblems(Resource):
                 # attention and simply clicking buttons
                 pretest_done = len(self.repo.get_all_remaining_pretest_problems(course_id, user_id)) == 0
                 if pretest_done and (
-                    sum([x['correct'] for x in answers if
-                        (x['problem']['pretest'] and
-                            x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME)]) < 1):
+                    sum([x['correct'] for x in answers if (
+                        x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME
+                    )]) < 1
+                ):
                     done_with_course = True
                     nex = None
             except DataException as e:
                 print("--------------------\tDATA EXCEPTION: " + str(e))
                 abort(500, message=str(e))
 
-        return {"next": nex, "current": cur, "done_with_current": done_with_current, "okay": okay,
-                "done_with_course": done_with_course}
+        return {
+            "next": nex, "current": cur, "done_with_current": done_with_current, "okay": okay,
+            "done_with_course": done_with_course
+        }
 
 
 """ Argument parser for posting a user response """
@@ -107,7 +112,7 @@ selector_lock = threading.Lock()
 
 def run_selector(course_id, user_id, selector, repo):
     """
-    Run the problem selection sequence (in separate thread)
+    Run the problem selection sequence (in separate thread).
     """
     with selector_lock:
         """@type selector: SelectInterface
@@ -162,13 +167,13 @@ class UserInteraction(Resource):
             if nex and 'error' not in nex and args['problem'] == nex['problem_name']:
                 self.repo.advance_problem(course_id, user_id)
 
-            #TODO: guard against answering other problems...?
-            #possibly outside the scope of this software
+            # TODO: guard against answering other problems...?
+            # possibly outside the scope of this software
 
             self.repo.post_interaction(course_id, args['problem'], user_id, args['correct'],
                                        args['attempt'], args['unix_seconds'])
 
-            #is the user now done? if so hack in a call to psiturk+bo module TODO: do this only once
+            # is the user now done? if so hack in a call to psiturk+bo module TODO: do this only once
             """
             if user_id in self.repo.get_finished_users(course_id):
                 print "USER IS DONE! ONTO BAYESIAN OPTIMIZATION!"
@@ -177,19 +182,19 @@ class UserInteraction(Resource):
 
             # the user needs a new problem, start choosing one
             try:
-                # print("--------------------\tSTARTING SELECTOR!")
+                print("--------------------\tSTARTING SELECTOR!")
                 """t = threading.Thread(target=run_selector, args=(course_id, user_id, self.selector, self.repo))
                 t.start()
                 t.join()
                 #TODO: actually run in other thread """
                 run_selector(course_id, user_id, self.selector, self.repo)
             except Exception as e:
-                # print("--------------------\tEXCEPTION STARTING SELECTION THREAD: " + str(e))
+                print("--------------------\tEXCEPTION STARTING SELECTION THREAD: " + str(e))
                 abort(500, message="Interaction successfully stored, but an error occurred starting "
                                    "a problem selection thread: " + e.message)
 
         except DataException as e:
-            # print("--------------------\tDATA EXCEPTION: " + str(e))
+            print("--------------------\tDATA EXCEPTION: " + str(e))
             abort(500, message=e.message)
 
         return {"success": True}, 200

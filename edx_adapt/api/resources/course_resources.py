@@ -38,6 +38,7 @@ skill_parser = reqparse.RequestParser()
 skill_parser.add_argument('skill_name', type=str, required=True, location='json',
                           help="Please supply the name of a skill")
 
+
 class Skills(Resource):
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
@@ -109,6 +110,7 @@ problem_parser.add_argument('pretest', type=bool, location='json',
 problem_parser.add_argument('posttest', type=bool, location='json',
                             help="Set True if this is a posttest problem. Mutually exclusive with pretest")
 
+
 class Problems(Resource):
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
@@ -125,8 +127,8 @@ class Problems(Resource):
 
     def post(self, course_id):
         args = problem_parser.parse_args()
-        # print "Post problem args:"
-        # print args
+        print "Post problem args:"
+        print args
         try:
             if args['pretest']:
                 self.repo.post_pretest_problem(course_id, args['skills'], args['problem_name'], args['tutor_url'])
@@ -147,6 +149,7 @@ experiment_parser.add_argument('start_time', type=int, location='json', required
                           help="Please supply the start date in unix seconds")
 experiment_parser.add_argument('end_time', type=int, location='json', required=True,
                           help="Please supply the end date in unix seconds")
+
 
 class Experiments(Resource):
     def __init__(self, **kwargs):

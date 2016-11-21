@@ -52,7 +52,8 @@ class BaseTestCase(unittest.TestCase):
             data = {'problem': problem, 'correct': correct_value, 'attempt': 1}
             self.app.post(
                 base + '/{}/user/{}/interaction'.format(self.course_id, self.student_name),
-                data=json.dumps(data), headers=self.headers
+                data=json.dumps(data),
+                headers=self.headers
             )
 
     def _answer_problem(self, correct=True, attempt=1, repeat=1, next_problem=True):
@@ -71,14 +72,16 @@ class BaseTestCase(unittest.TestCase):
             data = {'problem': problem['problem_name'], 'correct': correct, 'attempt': attempt}
             self.app.post(
                 base + '/{}/user/{}/interaction'.format(self.course_id, self.student_name),
-                data=json.dumps(data), headers=self.headers
+                data=json.dumps(data),
+                headers=self.headers
             )
             attempt += 0 if next_problem else 1
 
     def _add_probabilities_to_user_kill(self, probabilities):
         for skill in self.skills:
-            payload = json.dumps({'course_id': self.course_id, 'params': probabilities,
-                                  'user_id': self.student_name, 'skill_name': skill})
+            payload = json.dumps({
+                'course_id': self.course_id, 'params': probabilities, 'user_id': self.student_name, 'skill_name': skill
+            })
             self.app.post('/api/v1/parameters', data=payload, headers=self.headers)
 
 
@@ -112,27 +115,38 @@ class PreAssessmentTestCase(BaseTestCase):
         # set up new student
         self.student_name = 'test_student_' + id_generator()
 
-        self.app.post(base + '/{}/user'.format(self.course_id),
-                      data=json.dumps({'user_id': self.student_name}), headers=self.headers)
+        self.app.post(
+            base + '/{}/user'.format(self.course_id),
+            data=json.dumps({'user_id': self.student_name}),
+            headers=self.headers
+        )
         # Default student params
         probabilities = {'pg': 0.25, 'ps': 0.25, 'pi': 0.1, 'pt': 0.5, 'threshold': 0.99}
 
         self._add_probabilities_to_user_kill(probabilities)
 
     def test_student_enrolled(self):
+        """
+        Test checking student is enrolled on course in Edx-Adapt.
+        """
         user = json.loads(self.app.get(base + '/{}/user'.format(self.course_id)).data)['users']['in_progress']
         self.assertTrue(user, msg="There is no any user enrolled on the course")
         self.assertGreaterEqual(len(user), 1)
         self.assertEqual(self.student_name, user[-1])
 
     def test_student_cut_off_after_all_correct_answers(self):
-
+        """
+        Test student got status "dode_with_course" after answering correctly on all pre-assessment problems.
+        """
         self._answer_pre_assessment_problems(correct=7, attention_question=False)
 
         status = json.loads(self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
         self.assertEqual(True, status['done_with_course'])
 
     def test_student_cut_off_after_all_incorrect_answers(self):
+        """
+        Test student got status "dode_with_course" after answering incorrectly on all pre-assessment problems.
+        """
         self._answer_pre_assessment_problems(correct=0)
         status = json.loads(self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
         self.assertEqual(True, status['done_with_course'])
@@ -141,20 +155,30 @@ class PreAssessmentTestCase(BaseTestCase):
 class MainLogicTestCase(BaseTestCase):
     def setUp(self):
         self.student_name = 'test_student_' + id_generator()
-        self.app.post(base + '/{}/user'.format(self.course_id),
-                      data=json.dumps({'user_id': self.student_name}), headers=self.headers)
+        self.app.post(
+            base + '/{}/user'.format(self.course_id),
+            data=json.dumps({'user_id': self.student_name}),
+            headers=self.headers
+        )
 
     def test_alternative_parameters_set_one(self):
+        """
+        Test student with alternative parameter set one (no need to go through course if pre-assessment not fault).
+        """
         probabilities = {'pg': 0.01, 'ps': 0.01, 'pi': 0.99, 'pt': 0.99, 'threshold': 0.90}
         self._add_probabilities_to_user_kill(probabilities)
         self._answer_pre_assessment_problems(correct=5)
         self._answer_problem(repeat=3)
         next_problem = json.loads(
-            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )['next']
         self.assertTrue(next_problem['posttest'])
         self.assertTrue(next_problem['problem_name'].startswith('Post_assessment'))
 
     def test_alternative_parameters_set_two(self):
+        """
+        Test student with alternative parameter set two (need do all course, even if all answers were correct).
+        """
         probabilities = {'pg': 0.5, 'ps': 0.5, 'pi': 0.01, 'pt': 0.01, 'threshold': 0.95}
         self._add_probabilities_to_user_kill(probabilities)
         self._answer_pre_assessment_problems(correct=5)
@@ -165,7 +189,8 @@ class MainLogicTestCase(BaseTestCase):
         for _ in range(given_answer):
             self._answer_problem()
             next_problem = json.loads(
-                self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+                self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+            )['next']
             self.assertFalse(next_problem['posttest'])
             self.assertFalse(next_problem['problem_name'].startswith('Post_assessment'))
 
@@ -181,52 +206,62 @@ class MainLogicTestCase(BaseTestCase):
         self._add_probabilities_to_user_kill(probabilities)
         self._answer_pre_assessment_problems(correct=5)
         next_problem = json.loads(
-            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )['next']
         self.assertEqual('b3', next_problem['problem_name'])
 
         self._answer_problem()
         next_problem = json.loads(
-            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )['next']
         self.assertEqual('b4', next_problem['problem_name'])
 
         self._answer_problem()
         next_problem = json.loads(
-            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )['next']
         self.assertEqual('b3_2_0', next_problem['problem_name'])
 
         self._answer_problem()
         next_problem = json.loads(
-            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )['next']
         self.assertEqual('labels_we', next_problem['problem_name'])
 
         self._answer_problem()
         next_problem = json.loads(
-            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)['next']
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )['next']
         self.assertEqual('skew_easy_0', next_problem['problem_name'])
 
         self._answer_problem()
 
         self._answer_problem(correct=False)
         status = json.loads(
-            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
         self.assertFalse(status['done_with_current'])
         self._answer_problem(attempt=2, next_problem=False)
         status = json.loads(
-            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
         self.assertTrue(status['done_with_current'])
 
         self._answer_problem(repeat=3)
 
         self._answer_problem(correct=False)
         status = json.loads(
-            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
         self.assertFalse(status['done_with_current'])
         self._answer_problem(attempt=2, next_problem=False)
         status = json.loads(
-            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
         self.assertTrue(status['done_with_current'])
 
         self._answer_problem(repeat=17)
         status = json.loads(
-            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data)
+            self.app.get('/api/v1/course/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
         self.assertTrue(status['next']['posttest'])

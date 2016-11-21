@@ -12,10 +12,10 @@ import random
 import json
 from boto.mturk.connection import MTurkConnection
 
-# from moe.optimal_learning.python import bo_edu
-# from moe.optimal_learning.python.student_objectives import skills_performance_objective_32nd
-#sys.modules['bo_edu'] = bo_edu
-# from moe.optimal_learning.python.bo_edu import BOEDUExperiment, Trajectory, next_moe_pts_edu
+from moe.optimal_learning.python import bo_edu
+from moe.optimal_learning.python.student_objectives import skills_performance_objective_32nd
+# sys.modules['bo_edu'] = bo_edu
+from moe.optimal_learning.python.bo_edu import BOEDUExperiment, Trajectory, next_moe_pts_edu
 
 from edx_adapt.data.interface import DataInterface
 from edx_adapt.data.interface import DataException

@@ -6,8 +6,7 @@
 
     //Connection information
     edx_adapt.apistr    = '/api/v1';
-    // edx_adapt.server     = 'cmustats.tk'
-    edx_adapt.server     = '52.210.53.36';
+    edx_adapt.server     = '52.210.53.36'
     edx_adapt.apiport   = '8080';
     edx_adapt.coursestr = 'CMU/STAT101/2014_T1';
     edx_adapt.courseid  = 'CMUSTAT101';

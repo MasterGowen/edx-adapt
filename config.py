@@ -3,7 +3,7 @@ EDX = {
     'COURSE_ID': 'course-v1:CMU+STAT101+2014_T1',
 }
 EDXADAPT = {
-    'HOST': 'localhost',
+    'HOST': '52.210.53.36',
     'PORT': '8080',
     'COURSE_ID': 'CMUSTAT101'
 }
