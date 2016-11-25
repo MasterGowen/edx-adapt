@@ -7,7 +7,7 @@ import random
 
 class CourseRepository(interface.DataInterface):
     """
-    Create single database.
+    Implementation of the DataInterface.
     """
 
     def __init__(self, storage_module):

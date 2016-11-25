@@ -11,8 +11,7 @@ class BKT(ModelInterface):
     the probability of getting the next problem correct
     """
 
-    # Forward probability vector
-    alpha = [0, 0]
+    alpha = [0, 0]  # Forward probability vector
 
     def get_probability_mastered(self, trajectory, parameters):
         self.initialize_probability(parameters, 0, 0)

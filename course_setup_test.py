@@ -5,7 +5,7 @@ from config import EDX, EDXADAPT
 from edx_adapt.api import adapt_api
 
 DO_BASELINE_SETUP = False
-COURSE_ID = 'course-v1:CMU+STAT101+2014_T1'
+COURSE_ID = EDX['COURSE_ID']
 
 SKILL2INDEX = {}  # Skill names to their indices
 PROBLEM2SKILL = {}  # Dictionary of problems (seq_problemid) to their skill indices
@@ -16,7 +16,7 @@ SKILL2SEQ = []  # list of sets, where the list index is the skill index, and the
 # The above are filled using skills.csv file, so any changes to the skill structure must be specified in the skills.csv
 
 
-def prepare_course(course_id):
+def setup_course_in_edxadapt(course_id):
     """
     Add course into edx-adapt.
     
@@ -82,4 +82,4 @@ def prepare_course(course_id):
         )
 
 if __name__ == '__main__':
-    prepare_course(COURSE_ID)
+    setup_course_in_edxadapt(COURSE_ID)
