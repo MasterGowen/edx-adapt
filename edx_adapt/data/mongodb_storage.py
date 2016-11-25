@@ -1,5 +1,5 @@
 from json import loads
-from bson.json_util import dumps
+from bson import json_util
 from pymongo import MongoClient
 from flask import Response
 
@@ -58,7 +58,7 @@ class MongoDbStorage(interface.StorageInterface):
         r = {}
         for table_name in self.db.collection_names():
             r[table_name] = list(self.db[table_name].find())
-        return loads(dumps(r))  # To serialize Mongo's ObjectIds
+        return loads(json_util.dumps(r))  # To serialize Mongo's ObjectIds
 
     def _assert_no_table(self, table_name):
         if table_name in self.get_tables():

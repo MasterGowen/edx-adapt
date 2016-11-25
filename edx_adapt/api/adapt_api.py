@@ -8,10 +8,7 @@ import resources.tutor_resources as TR
 import resources.data_serve_resources as DR
 import resources.model_resources as MR
 import resources.etc_resources as ER
-# import data and model stuff
 import edx_adapt.data.course_repository as repo
-import edx_adapt.data.tinydb_storage as store
-import edx_adapt.data.sqlite_storage as sqlitestore
 import edx_adapt.data.mongodb_storage as mongodbstore
 import edx_adapt.select.skill_separate_random_selector as select
 import edx_adapt.model.bkt as bkt
@@ -21,12 +18,9 @@ app.debug = False
 CORS(app)
 api = Api(app)
 
-
 # TODO: load from settings
 base = '/api/v1'
 
-#database = repo.CourseRepository(store.TinydbStorage('/tmp/edx_adapt.json'))
-# database = repo.CourseRepository(sqlitestore.SqliteStorage('/tmp/edx_adapt.db'))
 database = repo.CourseRepository(mongodbstore.MongoDbStorage('mongodb://localhost:27017/'))
 student_model = bkt.BKT()
 selector = select.SkillSeparateRandomSelector(database, student_model, "user skill")
@@ -61,8 +55,11 @@ api.add_resource(DR.UserTrajectoryRequest, base + '/data/trajectory/course/<cour
                  resource_class_kwargs={'data': database, 'selector': selector})
 api.add_resource(DR.CourseTrajectoryRequest, base + '/data/trajectory/course/<course_id>',
                  resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(DR.ExperimentTrajectoryRequest, base + '/data/trajectory/course/<course_id>/experiment/<experiment_name>',
-                 resource_class_kwargs={'data': database, 'selector': selector})
+api.add_resource(
+    DR.ExperimentTrajectoryRequest,
+    base + '/data/trajectory/course/<course_id>/experiment/<experiment_name>',
+    resource_class_kwargs={'data': database, 'selector': selector}
+)
 
 api.add_resource(MR.Parameters, base+'/parameters',
                  resource_class_kwargs={'data': database, 'selector': selector})
@@ -100,7 +97,6 @@ def page_not_found(e):
 
 @app.before_request
 def log_request_info():
-    #app.logger.debug('Headers: %s', flask.request.headers)
     app.logger.debug('Body: %s', flask.request.get_data())
 
 

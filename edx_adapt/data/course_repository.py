@@ -4,12 +4,11 @@ import datetime
 import interface
 import random
 
-class CourseRepository(interface.DataInterface):
 
-    #create single database
-    #TODO: yeah...
-    #db = TinyDB('/tmp/2.json')
-    #write_lock = threading.Lock()
+class CourseRepository(interface.DataInterface):
+    """
+    Implementation of the DataInterface.
+    """
 
     def __init__(self, storage_module):
         super(CourseRepository, self).__init__(storage_module)
@@ -24,7 +23,7 @@ class CourseRepository(interface.DataInterface):
             pass
 
         """ Course setup methods """
-    def post_course(self, course_id):
+    def post_course(self, course_id, *args):
         self.store.create_table(course_id)
         self.store.set(course_id, 'users_in_progress', [])
         self.store.set(course_id, 'users_finished', [])
@@ -60,7 +59,6 @@ class CourseRepository(interface.DataInterface):
     """ Retrieve course information """
     def get_course_ids(self):
         courses = self.store.get_tables()
-        courses.remove('_default')
         courses.remove(self.generic_table_name)
         return list(courses)
 
@@ -99,9 +97,10 @@ class CourseRepository(interface.DataInterface):
         data = {'problem': problem, 'correct': correct, 'attempt': attempt, 'unix_s': unix_seconds, 'type': 'response',
                 'timestamp': datetime.datetime.fromtimestamp(unix_seconds).strftime('%Y-%m-%d %H:%M:%S')}
 
-        old_attempt = [x for x in self.get_raw_user_data(course_id, user_id)
-                       if x['problem']['problem_name'] == problem_name and x['type'] == 'response'
-                          and x['attempt'] == attempt]
+        old_attempt = [
+            x for x in self.get_raw_user_data(course_id, user_id) if x['problem']['problem_name'] == problem_name and
+            x['type'] == 'response' and x['attempt'] == attempt
+        ]
 
         if len(old_attempt) > 0:
             # don't record the same attempt twice
@@ -121,8 +120,11 @@ class CourseRepository(interface.DataInterface):
 
     def post_load(self, course_id, problem_name, user_id, unix_seconds):
         problem = self._get_problem(course_id, problem_name)
-        if problem != self.get_current_problem(course_id, user_id) and problem != self.get_next_problem(course_id, user_id):
-            #Don't log if this isn't the right problem
+        if (
+            problem != self.get_current_problem(course_id, user_id) and
+            problem != self.get_next_problem(course_id, user_id)
+        ):
+            # Don't log if this isn't the right problem
             return
 
         key = self._get_user_log_key(user_id)
@@ -132,7 +134,7 @@ class CourseRepository(interface.DataInterface):
         older_loads = [x for x in self.get_raw_user_data(course_id, user_id)
                        if x['problem']['problem_name'] == problem_name and x['type'] == 'page_load']
         if len(older_loads) > 0:
-            #already stored a load time for this problem. For now, don't record this one
+            # already stored a load time for this problem. For now, don't record this one
             return
 
         self.store.append(course_id, key, data)

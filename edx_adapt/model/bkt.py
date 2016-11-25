@@ -1,14 +1,17 @@
 import math
 from interface import ModelInterface
 
+
 class BKT(ModelInterface):
-    """ This is an example implementation of a student model interface.
+    """
+    This is an example implementation of a student model interface.
+
     Bayesian Knowledge Tracing uses a hidden Markov model to model
     the students, where the forward algorithm is used to compute
     the probability of getting the next problem correct
     """
 
-    alpha = [0, 0] # Forward probability vector
+    alpha = [0, 0]  # Forward probability vector
 
     def get_probability_mastered(self, trajectory, parameters):
         self.initialize_probability(parameters, 0, 0)
@@ -51,7 +54,6 @@ class BKT(ModelInterface):
         self.alpha[0] /= norm
         self.alpha[1] /= norm
 
-
     def update_probability(self, params, is_correct):
         """
         Updates the forward probability vector at each time point according to whether
@@ -66,7 +68,6 @@ class BKT(ModelInterface):
         self.new_alpha = [self.alpha[0] * (1 - params['pt']), self.alpha[0] * params['pt'] + self.alpha[1]]
         self.alpha[0] = self.new_alpha[0]
         self.alpha[1] = self.new_alpha[1]
-
 
     def get_current_probability_correct(self, params):
         """

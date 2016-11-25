@@ -13,6 +13,7 @@ param_parser.add_argument('skill_name', type=str, location='json', help="Optiona
 param_parser.add_argument('params', type=dict, location='json', required=True,
                           help="Please supply the desired model parameters as a dictionary")
 
+
 class Parameters(Resource):
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
