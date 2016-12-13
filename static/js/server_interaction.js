@@ -6,10 +6,14 @@
 
     //Connection information
     edx_adapt.apistr    = '/api/v1';
-    edx_adapt.server     = '52.210.53.36'
+    edx_adapt.server    = '52.210.53.36';
     edx_adapt.apiport   = '8080';
-    edx_adapt.coursestr = 'CMU/STAT101/2014_T1';
-    edx_adapt.courseid  = 'CMUSTAT101';
+
+    edx_adapt.course_id = $(".xmodule_display", window.parent.document).attr('data-course-id');
+
+    //Convert course_id taken from the Course page into a course string compatible with EdxAdapt. E.g:
+    //course_id = course-v1:University+SS001+2017_N is transformed into University/SS001/2017_N
+    edx_adapt.coursestr = edx_adapt.course_id.split(':')[1].replace('+', '/');
 
     //Notify problem server that a problem has been graded
     //on error, dispatches send_interaction_error event
