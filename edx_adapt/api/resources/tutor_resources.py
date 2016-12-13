@@ -74,14 +74,16 @@ class UserProblems(Resource):
                 # if answer to ATTENTION_QUESTION_NAME is wrong -
                 # then filter out this user, because they are not paying
                 # attention and simply clicking buttons
-                pretest_done = len(self.repo.get_all_remaining_pretest_problems(course_id, user_id)) == 0
-                if pretest_done and (
-                    sum([x['correct'] for x in answers if (
-                        x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME
-                    )]) < 1
-                ):
-                    done_with_course = True
-                    nex = None
+                # FIXME(idegtiarov) Not every course has attention question, that is why following checking condition
+                # should be rewrite in more generic way
+                # pretest_done = len(self.repo.get_all_remaining_pretest_problems(course_id, user_id)) == 0
+                # if pretest_done and (
+                #     sum([x['correct'] for x in answers if (
+                #         x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME
+                #     )]) < 1
+                # ):
+                #     done_with_course = True
+                #     nex = None
             except DataException as e:
                 print("--------------------\tDATA EXCEPTION: " + str(e))
                 abort(500, message=str(e))
