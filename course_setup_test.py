@@ -82,4 +82,4 @@ def setup_course_in_edxadapt(course_id):
         )
 
 if __name__ == '__main__':
-    setup_course_in_edxadapt(COURSE_ID)
+    setup_course_in_edxadapt(EDXADAPT['COURSE_ID'])

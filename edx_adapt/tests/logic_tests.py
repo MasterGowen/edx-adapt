@@ -36,17 +36,20 @@ class BaseTestCase(unittest.TestCase):
         regex = re.compile('_student_')
         mclient.Generic.remove({'key': {'$regex': regex}})
 
-    def _answer_pre_assessment_problems(self, correct=0, attention_question=True):
+    def _answer_pre_assessment_problems(self, correct_answers=0, attention_question=True):
         """
         Automation fulfilling Pre-Assessment problems
 
-        :param correct: int, Number of correct answers
+        :param correct_answers: int, Number of correct answers
         :param attention_question: bool, by default one of correct answers id assigned to AttentionQuestion
         """
         pre_assessments = ['Pre_assessment_{}'.format(i) for i in range(0, 14)]
-        for i, problem in enumerate(pre_assessments):
-            correct_value = True if i < correct - attention_question or (attention_question and i == 13) else False
-            data = {'problem': problem, 'correct': correct_value, 'attempt': 1}
+        for answered_problem, problem in enumerate(pre_assessments):
+            is_correct = (
+                answered_problem < correct_answers - attention_question or
+                (correct_answers and attention_question and answered_problem == len(pre_assessments) - 1)
+            )
+            data = {'problem': problem, 'correct': is_correct, 'attempt': 1}
             self.app.post(
                 base_api_path + '/{}/user/{}/interaction'.format(self.course_id, self.student_name),
                 data=json.dumps(data),
@@ -143,7 +146,7 @@ class PreAssessmentTestCase(BaseTestCase):
         """
         Test student got status "done_with_course" after answering correctly on all pre-assessment problems.
         """
-        self._answer_pre_assessment_problems(correct=7, attention_question=False)
+        self._answer_pre_assessment_problems(correct_answers=7, attention_question=False)
 
         status = json.loads(self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data)
         self.assertEqual(True, status['done_with_course'])
@@ -152,7 +155,7 @@ class PreAssessmentTestCase(BaseTestCase):
         """
         Test student got status "done_with_course" after answering incorrectly on all pre-assessment problems.
         """
-        self._answer_pre_assessment_problems(correct=0)
+        self._answer_pre_assessment_problems(correct_answers=0)
         status = json.loads(self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data)
         self.assertEqual(True, status['done_with_course'])
 
@@ -172,7 +175,7 @@ class MainLogicTestCase(BaseTestCase):
         """
         probabilities = {'pg': 0.01, 'ps': 0.01, 'pi': 0.99, 'pt': 0.99, 'threshold': 0.90}
         self._add_probabilities_to_user_skill(probabilities)
-        self._answer_pre_assessment_problems(correct=5)
+        self._answer_pre_assessment_problems(correct_answers=5)
         self._answer_problem(repeat=3)
         next_problem = json.loads(
             self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
@@ -186,7 +189,7 @@ class MainLogicTestCase(BaseTestCase):
         """
         probabilities = {'pg': 0.5, 'ps': 0.5, 'pi': 0.01, 'pt': 0.01, 'threshold': 0.95}
         self._add_probabilities_to_user_skill(probabilities)
-        self._answer_pre_assessment_problems(correct=5)
+        self._answer_pre_assessment_problems(correct_answers=5)
         pre_and_post_assessment = 28  # Sum of pre-assessment and post-assessment problems
         # NOTE(idegtiarov) to ensure that all problems in main part was touched we check that before answered
         # all 'main' part's problems edx-adapt doesn't propose problem from Post_assessment part
@@ -210,7 +213,7 @@ class MainLogicTestCase(BaseTestCase):
         """
         probabilities = {'pg': 0.25, 'ps': 0.25, 'pi': 0.1, 'pt': 0.5, 'threshold': 0.99}
         self._add_probabilities_to_user_skill(probabilities)
-        self._answer_pre_assessment_problems(correct=5)
+        self._answer_pre_assessment_problems(correct_answers=5)
         next_problem = json.loads(
             self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
         )['next']

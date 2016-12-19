@@ -1,4 +1,5 @@
-import sys, os
+import os
+import sys
 
 name = sys.argv[1]
 
