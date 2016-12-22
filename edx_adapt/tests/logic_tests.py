@@ -6,8 +6,8 @@ import unittest
 
 import pymongo
 
-import course_setup_test
 from edx_adapt.api import adapt_api
+from tools import course_setup_test
 
 COURSE_ID = 'CMUSTAT'
 
