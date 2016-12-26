@@ -1,0 +1,112 @@
+<html>
+<head>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+    <script src="https://edx-stanford-dev.raccoongang.com/course-content/2017_N/static/js/server_interaction.js" type="text/javascript"></script>
+    <script type="text/javascript">
+        function getUrlVars() {
+            var vars = {};
+            var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
+                vars[key] = value;
+            });
+            return vars;
+        }
+
+        vars = getUrlVars();
+        showLink = (vars['showlink'] == 'true' || vars['showlink'] == 'True' || vars['showlink'] == 'yes');
+        showComplete = (vars['completed'] == 'true' || vars['completed'] == 'True' || vars['completed'] == 'yes');
+        divname = vars['iframe'];
+
+        function resizeIframe() {
+          height = document.getElementById('all').offsetHeight + 30;
+          window.parent.document.getElementById(divname).height = height + 'px';
+        }
+
+        function display_problem_callback(e)
+        {
+            var text_div = document.getElementById('text');
+            if(e.detail.display == true) {
+                //We're in the right place, display the problem
+                text_div.innerHTML = window.parent.document.getElementById(vars['div']).getAttribute('text');
+            } else {
+                //We're in the wrong place, redirect to correct page
+                window.top.location.href = e.detail.redirect
+            }
+            resizeIframe();
+        }
+
+        function display_problem_error_callback(e)
+        {
+            var text_div = document.getElementById('text');
+            text_div.innerHTML = "Error connecting to RL server.</br> Probably you are not enrolled in Adapt application, if it is your case visit Adapt enrolling page for that section, usually 'Introduction' or connect to the support team if automatic enrollment is not provided.</br> Details: " + e.detail.err + "</br>" + e.detail.textStatus;
+            resizeIframe();
+        }
+
+        function is_complete_callback(e)
+        {
+            if(e.detail.err)
+            {
+                document.getElementById('completed').innerHTML = "Error choosing next problem: </br>" + JSON.stringify(e.detail.data);
+                resizeIframe();
+                return
+            }
+            if(e.detail.complete)
+            {
+
+                document.getElementById('completed').innerHTML = '<button style="border-radius: 5px" height="50"
+                onclick="window.top.location.replace(\'' + e.detail.link +'\')"><font size="4">Please click here to go on to the next problem.</font></button>';
+                resizeIframe();
+
+                if(e.detail.done_with_course && edx_adapt.get_problem_name().indexOf('Pre_as') > -1)
+                {
+                    document.getElementById('completed').innerHTML = '<b>Unfortunately you already understand statistics too well for this study. Thank you, and please close this window and complete the HIT for the minimum payment.</b>';
+                }
+                if(e.detail.done_with_course)
+                {
+                    document.getElementById('completed').innerHTML = '<b>Thank you for finishing the study. Please close this window and return to TURK.</b>';
+                }
+
+                //TODO: pretest rejection
+                //document.getElementById('completed').innerHTML = '<font size="5"><b>Woah!</b> You\'re already super smart, way too smart for this study. Thank you for your time, please close this window.</font>';
+
+                //resize for the button
+                resizeIframe();
+            }
+        }
+
+        function is_complete_error(e)
+        {
+            document.getElementById('completed').innerHTML = "Error retrieving user information.</br>" + e.detail.err + "</br>" + e.detail.textStatus
+        }
+
+    </script>
+</head>
+<body>
+
+    <div id="all">
+    <p id="text" style="font-family:verdana">Loading content. Please wait...</p>
+
+    <script>
+        vars = getUrlVars();
+        if(showComplete)
+        {
+            //divname = "complete";
+            document.getElementById('text').innerHTML = '';
+            document.addEventListener("is_complete", is_complete_callback);
+            document.addEventListener("is_complete_error", is_complete_error);
+            window.edx_adapt.is_complete(vars['user_id'], edx_adapt.get_problem_name());
+        }
+        else {
+            document.addEventListener("display_problem_request", display_problem_callback);
+            document.addEventListener("display_problem_request_error", display_problem_error_callback);
+            window.edx_adapt.display_problem_request(vars['user_id'], edx_adapt.get_problem_name());
+        }
+
+    </script>
+
+    <p id="completed"></p>
+
+    </div>
+
+</body>
+</html>

@@ -257,6 +257,8 @@
         {
             if(e.detail.display == true) {
                 //We're in the right place, display the problem
+                document.addEventListener("notify_page_load_error", pageload_error);
+                edx_adapt.notify_page_load(vars['user_id'], edx_adapt.get_problem_name());
                 displayed = true;
                 createForm("form");
                 //in case setState() has already been called, we need to repopulate the form with the user's last inputs
@@ -293,8 +295,6 @@
     <script>
         getVars();
         createAnswers();
-        document.addEventListener("notify_page_load_error", pageload_error);
-        edx_adapt.notify_page_load(vars['user_id'], edx_adapt.get_problem_name());
 
         document.addEventListener("display_problem_request", display_problem_callback);
         document.addEventListener("display_problem_request_error", display_problem_error_callback);

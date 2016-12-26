@@ -107,14 +107,22 @@
 
 
     //This function grabs the problem name out of the URL
-    //TODO: make it a bit smarter
     edx_adapt.get_problem_name = function() {
         var problemurl = document.referrer;
         problemurl = problemurl.split("?signin=return").join("");
         while (problemurl.slice(-1) == '/') {
-            problemurl = problemurl.substring(0, problemurl.length - 1);
+                problemurl = problemurl.substring(0, problemurl.length - 1);
         }
         var problemname = problemurl.substring(problemurl.lastIndexOf("/") + 1);
+        problemname = problemname.replace(/%40/g, '@');
+        if (problemname.indexOf('@') > -1) {
+                problemname_list = problemname.split('@');
+                problemname = problemname_list[problemname_list.length - 1];
+        }
+        if (parent.document.getElementById('problem_' + problemname) == null) {
+                console.log('On a Wrong Page');
+                return 'None';
+        }
         return problemname;
     };
 
@@ -142,8 +150,8 @@
                     if (data['okay'] == false) {
 
                         if (data['next'] == null) {
-                            //The server just hasn't set the next problem yet. Wait and retry (for 5s)
-                            if (retry < 5) {
+                            //The server just hasn't set the next problem yet. Retry twice, wait between attempts for 1s.
+                            if (retry < 2) {
                                 setTimeout(function () {
                                     edx_adapt.is_complete(user, problem, retry + 1);
                                 }, 1000);
@@ -167,7 +175,7 @@
                     }
                 } else {
                     //not done with current problem. Check again in a bit to make sure...
-                    if (retry < 2) {
+                    if (retry < 1) {
                         setTimeout(function () {
                             edx_adapt.is_complete(user, problem, retry + 1);
                         }, 1000)
