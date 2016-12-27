@@ -38,7 +38,7 @@
         function display_problem_error_callback(e)
         {
             var text_div = document.getElementById('text');
-            text_div.innerHTML = "Error connecting to RL server.</br> Probably you are not enrolled in Adapt application, if it is your case visit Adapt enrolling page for that section, usually 'Introduction' or connect to the support team if automatic enrollment is not provided.</br> Details: " + e.detail.err + "</br>" + e.detail.textStatus;
+            text_div.innerHTML = "Error connecting to EdxAdapt server.</br> Probably you are not enrolled in Adapt application, if it is your case visit Adapt enrolling page for that section, usually 'Introduction' or connect to the support team if automatic enrollment is not provided.</br> Details: " + e.detail.err + "</br>" + e.detail.textStatus;
             resizeIframe();
         }
 
