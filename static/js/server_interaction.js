@@ -145,7 +145,7 @@
                             document.dispatchEvent(event);
                 }
 
-                if (data['done_with_current'] && data['current'] != null && data['current']['problem_name'] == problem) {
+                else if (data['done_with_current'] && data['current'] != null && data['current']['problem_name'] == problem) {
                     //done w/ current problem. Redirect to next one if possible
                     if (data['okay'] == false) {
 

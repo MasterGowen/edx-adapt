@@ -1,6 +1,7 @@
 """Repository that implements DataInterface using a tinydb backend """
 
-import datetime
+from datetime import datetime
+
 import interface
 import random
 
@@ -15,7 +16,7 @@ class CourseRepository(interface.DataInterface):
         """@type self.store: StorageInterface"""
         self.generic_table_name = "Generic"
         try:
-            self.store.create_table(self.generic_table_name)
+            self.store.create_table(self.generic_table_name, [['key', 'ascending']])
             self.store.set(self.generic_table_name, "MAGIC JOHNSON", "This is the generic store table")
         except interface.DataException as e:
             print "!!!! Make sure this isn't a problem: " + str(e)
@@ -95,7 +96,7 @@ class CourseRepository(interface.DataInterface):
         problem = self._get_problem(course_id, problem_name)
         key = self._get_user_log_key(user_id)
         data = {'problem': problem, 'correct': correct, 'attempt': attempt, 'unix_s': unix_seconds, 'type': 'response',
-                'timestamp': datetime.datetime.fromtimestamp(unix_seconds).strftime('%Y-%m-%d %H:%M:%S')}
+                'timestamp': datetime.fromtimestamp(unix_seconds).strftime('%Y-%m-%d %H:%M:%S')}
 
         old_attempt = [
             x for x in self.get_raw_user_data(course_id, user_id) if x['problem']['problem_name'] == problem_name and
@@ -129,7 +130,7 @@ class CourseRepository(interface.DataInterface):
 
         key = self._get_user_log_key(user_id)
         data = {'problem': problem, 'unix_s': unix_seconds, 'type': 'page_load',
-                'timestamp': datetime.datetime.fromtimestamp(unix_seconds).strftime('%Y-%m-%d %H:%M:%S')}
+                'timestamp': datetime.fromtimestamp(unix_seconds).strftime('%Y-%m-%d %H:%M:%S')}
 
         older_loads = [x for x in self.get_raw_user_data(course_id, user_id)
                        if x['problem']['problem_name'] == problem_name and x['type'] == 'page_load']
@@ -292,7 +293,7 @@ class CourseRepository(interface.DataInterface):
                     done.append(interaction['problem'])
         return done
 
-    def _get_remaining_by_user(self, course_id, user_id):  
+    def _get_remaining_by_user(self, course_id, user_id):
         all = self.store.get(course_id, 'problems')
         done = self._get_probs_done(course_id, user_id)
         remaining = [x for x in all if x not in done]
@@ -321,3 +322,271 @@ class CourseRepository(interface.DataInterface):
             problem_dict = self._get_problem(course_id, problem_dict['problem_name'])
             # above line will raise exception if it can't be found
         return problem_dict
+
+
+COLL_SUFFIX = {'log': '_log', 'user_problem': '_problems'}
+
+
+class CourseRepositoryMongo(CourseRepository):
+    """
+    Interface implementation for MongoDB backend
+    """
+    def post_course(self, course_id):
+        """
+        Create courses related document in Courses collection
+
+        :param course_id: ID of the Course
+        """
+        coll_log = course_id + COLL_SUFFIX['log']
+        coll_user_problem = course_id + COLL_SUFFIX['user_problem']
+        self.store.create_table('Courses')
+        self.store.create_table(
+            coll_log, index_fields=[
+                ['student_id', 'ascending'],
+                ['timestamp', 'descending'],
+                ['problem.problem_name', 'ascending'],
+                ['attempt', 'ascending']
+            ],
+            index_unique=True)
+        self.store.create_table(coll_user_problem, index_fields=[['student_id', 'ascending']])
+        data_dict = {
+            'course_id': course_id,
+            'users_in_progress': [],
+            'users_finished': [],
+            'skills': [],
+            'problems': [],
+            'experiments': []
+        }
+        self.store.record_data(table='Courses', data=data_dict)
+
+    def post_skill(self, course_id, skill_name):
+        """
+        Add skill in courses.skills field
+        :param course_id: ID of the course
+        :param skill_name: name of the added skill
+        """
+        self.store.course_append(course_id, 'skills', skill_name)
+
+    def _add_problem(self, course_id, skill_names, problem_name, tutor_url, b_pretest, b_posttest):
+        """
+        Internal class method for problem fulfilling
+
+        :param course_id: ID of the Course
+        :param skill_names: list of skills names
+        :param problem_name: string of problem name
+        :param tutor_url: string with tutor url
+        :param b_pretest: boolean flag to mark problem as pretest
+        :param b_posttest: boolean flag to mark problem as posttest
+        """
+        unknown_skills = set(skill_names) - set(self.store.course_get(course_id, 'skills'))
+        if unknown_skills:
+            raise interface.DataException("No such skill(s): {}".format(list(unknown_skills)))
+        self.store.course_append(
+            course_id, 'problems', {
+                'problem_name': problem_name,
+                'tutor_url': tutor_url,
+                'pretest': b_pretest,
+                'posttest': b_posttest,
+                'skills': skill_names
+            }
+        )
+
+    def enroll_user(self, course_id, user_id):
+        coll = course_id + COLL_SUFFIX['user_problem']
+        self.store.course_append(course_id, 'users_in_progress', user_id)
+        self.store.record_data(coll, {'student_id': user_id, 'current': None, 'next': None})
+
+    def get_skills(self, course_id):
+        return self.store.course_get(course_id, 'skills')
+
+    def get_course_ids(self):
+        return self.store.get_tables()
+
+    def get_problems(self, course_id, skill_name=None):
+        """
+        Get all problems related to this course-skill pre-test, normal, and post-test
+
+        :param course_id: string ID of the course
+        :param skill_name: string (optional) name of the skill
+        :return: list of problems
+        """
+        problems = self.store.course_get(course_id, 'problems')
+        if skill_name:
+            return [problem for problem in problems if skill_name in problem['skills']]
+        return problems
+
+    def get_in_progress_users(self, course_id):
+        return self.store.course_get(course_id, 'users_in_progress')
+
+    def get_finished_users(self, course_id):
+        return self.store.course_get(course_id, 'users_finished')
+
+    def _get_problem(self, course_id, problem_name):
+        problems = self.store.course_search(
+                course_id, 'problems', {'problem_name': problem_name}, 'problems', {'problem_name': problem_name}
+        ).get('problems')
+        if problems:
+            return problems[0]
+        else:
+            raise interface.DataException("Problem not found: {}".format(problem_name))
+
+    def post_interaction(self, course_id, problem_name, user_id, correct, attempt, unix_seconds):
+        """
+        Store interaction notification in the database ..._log collection
+
+        :param course_id: course id
+        :param problem_name: name of the problem
+        :param user_id: student id
+        :param correct: boolean flag to mark answer is correct or not
+        :param attempt: number of attempts to answer the problem
+        :param unix_seconds: timestamp
+        """
+        problem = self._get_problem(course_id, problem_name)
+        if not problem:
+            raise interface.DataException("Problem {} not in Course generic problems list".format(problem_name))
+        data = {
+            'student_id': user_id,
+            'problem': problem,
+            'correct': correct,
+            'attempt': attempt,
+            'unix_s': unix_seconds, 'type': 'response',
+            'timestamp': datetime.fromtimestamp(unix_seconds).strftime('%Y-%m-%d %H:%M:%S')
+        }
+        coll = course_id + COLL_SUFFIX['log']
+        self.store.record_data(coll, data)
+
+        if not self.get_all_remaining_posttest_problems(course_id, user_id):
+            self.store.course_user_done(course_id, user_id)
+
+    def post_load(self, course_id, problem_name, user_id, unix_seconds):
+        """
+        Store logging notification about loading page with the problem
+
+        :param course_id: course id
+        :param problem_name: name of the problem
+        :param user_id: student id
+        :param unix_seconds: timestamp
+        """
+        problem = self._get_problem(course_id, problem_name)
+        coll = course_id + COLL_SUFFIX['log']
+        data = {
+            'student_id': user_id,
+            'problem': problem,
+            'unix_s': unix_seconds,
+            'type': 'page_load',
+            'timestamp': datetime.fromtimestamp(unix_seconds).strftime('%Y-%m-%d %H:%M:%S')
+        }
+        # NOTE(idegtiarov) checking that load was already stored for this problem doesn't need if we are interesting in
+        # correct statistic and logging additional/same data is ok
+        self.store.record_data(coll, data)
+
+    def set_next_problem(self, course_id, user_id, problem_dict):
+        """
+        Set problem described in problem_dict as next in collection ..._problem
+
+        :param course_id: course id
+        :param user_id:  student id
+        :param problem_dict: dict with problem description
+        """
+        coll = course_id + COLL_SUFFIX['user_problem']
+        update_dict = {'$set': {'next': problem_dict}}
+        self.store.update_doc(coll, {'student_id': user_id}, update_dict)
+
+    def advance_problem(self, course_id, user_id):
+        coll = course_id + COLL_SUFFIX['user_problem']
+        current_problem = self.store.get_one(coll, user_id, 'next')
+        self.store.update_doc(coll, {'student_id': user_id}, {'$set': {'current': current_problem, 'next': None}})
+
+    def _get_remaining_by_user(self, course_id, user_id):
+        coll = course_id + COLL_SUFFIX['log']
+        done = self.store.get_statistic(
+            coll, user_id, {'type': 'response'}, 'done', op='$addToSet', op_value='$problem')
+        if done.alive:
+            done = done.next()['done']
+            return [problem for problem in self.get_problems(course_id) if problem not in done]
+        else:
+            return self.get_problems(course_id)
+
+    def post_experiment(self, course_id, experiment_name, start, end):
+        experiment = {'experiment_name': experiment_name, 'start_time': start, 'end_time': end}
+        self.store.course_append(course_id, 'experiments', experiment)
+
+    def get_experiments(self, course_id):
+        return self.store.course_get(course_id, 'experiments')
+
+    def get_experiment(self, course_id, experiment_name):
+        return self.store.course_search(
+            course_id,
+            'experiments',
+            {'experiment_name': experiment_name},
+            'experiments',
+            {'experiment_name': experiment_name}
+        )['experiments'][0]
+
+    def delete_experiment(self, course_id, experiment_name):
+        self.store.update_doc(
+            'Courses', {'course_id': course_id}, {'$pull': {'experiments': {'experiment_name': experiment_name}}}
+        )
+
+    def get_subjects(self, course_id, experiment_name):
+        experiment = self.get_experiment(course_id, experiment_name)
+        users = self.get_finished_users(course_id)
+        coll = course_id + COLL_SUFFIX['log']
+        subjects = self.store.get_statistic(
+            coll,
+            course_id,
+            {'student_id': {'$in': users}, 'problem.posttest': True, 'unix_s': {'$lt': experiment['end_time']}},
+            group_key='subjects',
+            op='addToSet',
+            op_value='$student_id'
+        )
+        return subjects['subjects'] if subjects.alive else []
+
+    def get_raw_user_data(self, course_id, user_id):
+        coll = course_id + COLL_SUFFIX['log']
+        return self.store.get_user_logs(coll, user_id)
+
+    def get_raw_user_skill_data(self, course_id, skill_name, user_id):
+        coll = course_id + COLL_SUFFIX['log']
+        return self.store.get_user_logs(coll, user_id, add_filter={'problem.skills': skill_name})
+
+    def get_next_problem(self, course_id, user_id):
+        coll = course_id + COLL_SUFFIX['user_problem']
+        return self.store.get_one(coll, user_id, 'next')
+
+    def get_current_problem(self, course_id, user_id):
+        coll = course_id + COLL_SUFFIX['user_problem']
+        return self.store.get_one(coll, user_id, 'current')
+
+    def get_all_interactions(self, course_id, user_id):
+        coll = course_id + COLL_SUFFIX['log']
+        return self.store.get_user_logs(
+            coll,
+            user_id,
+            add_filter={'type': 'response', 'attempt': 1},
+            project={'problem': 1, 'correct': 1, 'unix_s': 1}
+        )
+
+    def get_interactions(self, course_id, skill_name, user_id):
+        coll = course_id + COLL_SUFFIX['log']
+        return self.store.get_user_logs(
+            coll,
+            user_id,
+            add_filter={'problem.skills': skill_name, 'type': 'response', 'attempt': 1},
+            project={'problem': 1, 'correct': 1, 'unix_s': 1}
+        )
+
+    def get_whole_trajectory(self, course_id, user_id):
+        coll = course_id + COLL_SUFFIX['log']
+        return self.store.get_user_logs(
+            coll, user_id, add_filter={'type': 'response', 'attempt': 1}, get_from_doc='correct'
+        )
+
+    def get_skill_trajectory(self, course_id, skill_name, user_id):
+        coll = course_id + COLL_SUFFIX['log']
+        return self.store.get_user_logs(
+            coll,
+            user_id,
+            add_filter={'problem.skills': skill_name, 'type': 'response', 'attempt': 1},
+            get_from_doc='correct'
+        )

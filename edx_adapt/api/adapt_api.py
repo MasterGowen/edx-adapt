@@ -9,7 +9,7 @@ import resources.data_serve_resources as DR
 import resources.model_resources as MR
 import resources.etc_resources as ER
 import edx_adapt.data.course_repository as repo
-import edx_adapt.data.mongodb_storage as mongodbstore
+import edx_adapt.data.mongodb_new_storage as mongodbstore
 import edx_adapt.select.skill_separate_random_selector as select
 import edx_adapt.model.bkt as bkt
 
@@ -21,7 +21,7 @@ api = Api(app)
 # TODO: load from settings
 base = '/api/v1'
 
-database = repo.CourseRepository(mongodbstore.MongoDbStorage('mongodb://localhost:27017/'))
+database = repo.CourseRepositoryMongo(mongodbstore.MongoDbStorage('mongodb://localhost:27017/'))
 student_model = bkt.BKT()
 selector = select.SkillSeparateRandomSelector(database, student_model, "user skill")
 

@@ -24,8 +24,6 @@ class StorageInterface(object):
         raise NotImplementedError( "Storage module must implement this" )
 
 
-
-
 class DataInterface(object):
     """ This is the interface for the persistent data store
     backing an edX-adapt course. It stores information about
@@ -165,10 +163,9 @@ class DataInterface(object):
     """
     def set(self, key, value):
         raise NotImplementedError( "Data module must implement this" )
+
     def get(self, key):
         raise NotImplementedError( "Data module must implement this" )
-
-
 
 
 class DataException(Exception):

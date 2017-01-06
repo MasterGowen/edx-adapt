@@ -166,7 +166,7 @@ class UserInteraction(Resource):
             # If this is a response to the "next" problem, advance to it first before storing
             # (shouldn't happen if PageLoad messages are posted correctly, but we won't require that)
             nex = self.repo.get_next_problem(course_id, user_id)
-            if nex and 'error' not in nex and args['problem'] == nex['problem_name']:
+            if nex and 'error' not in nex and args['problem'] == nex.get('problem_name'):
                 self.repo.advance_problem(course_id, user_id)
 
             # TODO: guard against answering other problems...?
@@ -223,7 +223,7 @@ class UserPageLoad(Resource):
         try:
             self.repo.post_load(course_id, args['problem'], user_id, args['unix_seconds'])
             nex = self.repo.get_next_problem(course_id, user_id)
-            if nex and 'error' not in nex and args['problem'] == nex['problem_name']:
+            if nex and 'error' not in nex and args['problem'] == nex.get('problem_name'):
                 self.repo.advance_problem(course_id, user_id)
         except DataException as e:
             print("--------------------\tDATA EXCEPTION: " + str(e))
