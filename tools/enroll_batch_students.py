@@ -109,7 +109,7 @@ def check_users_already_started(users_list, headers=None, **kwargs):
     checked_users = {'started': [], 'not_started': []}
     for user in users_list:
         status = requests.get(
-            'http://{host}:{port}/api/v1/course/{course_id}/user/{user_id}'.format(user_id=user, **kwargs),
+            'https://{host}:{port}/api/v1/course/{course_id}/user/{user_id}'.format(user_id=user, **kwargs),
             headers=headers
         ).json()
         if status['current']:
@@ -123,7 +123,7 @@ def get_enrolled_students(headers, **kwargs):
     """
     Get student already enrolled in edx-adapt.
     """
-    users = requests.get('http://{host}:{port}/api/v1/course/{course_id}/user'.format(**kwargs), headers=headers)
+    users = requests.get('https://{host}:{port}/api/v1/course/{course_id}/user'.format(**kwargs), headers=headers)
     if users:
         users = users.json()
         enrolled_users = {'started': set(), 'not_started': set()}
@@ -164,13 +164,13 @@ def main():
                     'skill_name': skill
                 }
                 requests.post(
-                    'http://{host}:{port}/api/v1/parameters'.format(**parameters), json=payload, headers=headers
+                    'https://{host}:{port}/api/v1/parameters'.format(**parameters), json=payload, headers=headers
                 )
             print("student's skill are added")
 
             payload = {'user_id': student_id}
             requests.post(
-                'http://{host}:{port}/api/v1/course/{course_id}/user'.format(**parameters),
+                'https://{host}:{port}/api/v1/course/{course_id}/user'.format(**parameters),
                 json=payload,
                 headers=headers
             )

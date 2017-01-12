@@ -77,13 +77,13 @@ def store_model_params():
 
     if parameters['update_probs']:
         req = requests.put(
-            'http://{host}:{port}/api/v1/course/{course_id}/probabilities'.format(**parameters),
+            'https://{host}:{port}/api/v1/course/{course_id}/probabilities'.format(**parameters),
             json=payload,
             headers=headers
         )
     else:
         req = requests.post(
-            'http://{host}:{port}/api/v1/course/{course_id}/probabilities'.format(**parameters),
+            'https://{host}:{port}/api/v1/course/{course_id}/probabilities'.format(**parameters),
             json=payload,
             headers=headers
         )

@@ -126,7 +126,7 @@ def setup_course_in_edxadapt(**kwargs):
     csv_path_files = get_problems_and_skills(kwargs['csv_files_dir'])
     headers = {'Content-type': 'application/json'}
     payload = json.dumps({'course_id': kwargs['course_id']})
-    requests.post('http://{host}:{port}/api/v1/course'.format(**kwargs), data=payload, headers=headers)
+    requests.post('https://{host}:{port}/api/v1/course'.format(**kwargs), data=payload, headers=headers)
     with open(csv_path_files['skills'], "r") as fin:
         max_skill_index = 0
         pretest2skill = {}
@@ -151,10 +151,10 @@ def setup_course_in_edxadapt(**kwargs):
 
     for k in SKILL2INDEX:
         payload = json.dumps({'skill_name': k})
-        requests.post('http://{host}:{port}/api/v1/course/{course_id}/skill'.format(**kwargs), data=payload, headers=headers)
+        requests.post('https://{host}:{port}/api/v1/course/{course_id}/skill'.format(**kwargs), data=payload, headers=headers)
 
     payload = json.dumps({'skill_name': "None"})
-    requests.post('http://{host}:{port}/api/v1/course/{course_id}/skill'.format(**kwargs), data=payload, headers=headers)
+    requests.post('https://{host}:{port}/api/v1/course/{course_id}/skill'.format(**kwargs), data=payload, headers=headers)
     table = [line.strip().split(',') for line in open(csv_path_files['problems']).readlines()]
     for row in table:
         msg = (
@@ -186,10 +186,10 @@ def setup_course_in_edxadapt(**kwargs):
         payload = json.dumps({
             'problem_name': pname, 'tutor_url': url, 'skills': [skill], 'pretest': pre, 'posttest': post
         })
-        requests.post('http://{host}:{port}/api/v1/course/{course_id}'.format(**kwargs), data=payload, headers=headers)
+        requests.post('https://{host}:{port}/api/v1/course/{course_id}'.format(**kwargs), data=payload, headers=headers)
 
     payload = json.dumps({'experiment_name': 'test_experiment2', 'start_time': 1462736963, 'end_time': 1999999999})
-    requests.post('http://{host}:{port}/api/v1/course/{course_id}/experiment'.format(**kwargs), data=payload, headers=headers)
+    requests.post('https://{host}:{port}/api/v1/course/{course_id}/experiment'.format(**kwargs), data=payload, headers=headers)
 
     if DO_BASELINE_SETUP:
         params = {'pi': 0.1, 'pt': 0.1, 'pg': 0.1, 'ps': 0.1, 'threshold': 1.0}
@@ -197,7 +197,7 @@ def setup_course_in_edxadapt(**kwargs):
         for skill in ['d to h', 'y axis', 'h to d', 'center', 'shape', 'x axis', 'histogram', 'spread']:
             tutor_params[skill] = params
         requests.post(
-            'http://{host}:{port}/api/v1/misc/SetBOParams'.format(**kwargs),
+            'https://{host}:{port}/api/v1/misc/SetBOParams'.format(**kwargs),
             data=json.dumps({'course_id': kwargs['course_id'], 'parameters': tutor_params}),
             headers=headers
         )
