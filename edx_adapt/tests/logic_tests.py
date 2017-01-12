@@ -6,8 +6,9 @@ import unittest
 
 import pymongo
 
+import course_setup_test
 from edx_adapt.api import adapt_api
-from tools import course_setup_test
+from tools import course_setup
 
 COURSE_ID = 'CMUSTAT'
 
@@ -23,7 +24,7 @@ class BaseTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.skills = ['center', 'shape', 'spread', 'x axis', 'y axis', 'h to d', 'd to h', 'histogram', 'None']
         cls.course_id = COURSE_ID + id_generator(3)
-        course_setup_test.setup_course_in_edxadapt(cls.course_id)
+        course_setup.setup_course_in_edxadapt(cls.course_id)
 
         cls.headers = {'Content-type': 'application/json'}
         cls.app = adapt_api.app.test_client()
@@ -100,7 +101,7 @@ class CourseTestCase(BaseTestCase):
     def test_course_problem_fulfilled(self):
         problems = json.loads(self.app.get(base_api_path + '/{}'.format(self.course_id)).data)
         self.assertTrue(problems, msg='Not any problem is found in course')
-        # NOTE(idegtiarov) Assert correct value is based on amount of problems defined in problist.tsv file, if this
+        # NOTE(idegtiarov) Assert correct value is based on amount of problems defined in problems.csv file, if this
         # file is changed test will fail.
         self.assertEqual(84, len(problems['problems']))
 
