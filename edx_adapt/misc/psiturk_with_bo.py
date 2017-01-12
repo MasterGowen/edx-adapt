@@ -20,6 +20,7 @@ from moe.optimal_learning.python.bo_edu import BOEDUExperiment, Trajectory, next
 from edx_adapt.data.interface import DataInterface
 from edx_adapt.data.interface import DataException
 from edx_adapt.select.interface import SelectException
+from edx_adapt import logger
 from edx_adapt.api.resources.data_serve_resources import fill_user_data
 import edx_adapt.api.resources.etc_resources as etc_resources
 
@@ -73,7 +74,7 @@ def extend_hit(repo):
         r = mturk_conn.extend_hit(hitid, assignments_increment=1)
         etc_resources.append_to_log("mturk_conn.extend_hit() returned: " + str(r), repo)
         r = mturk_conn.extend_hit(hitid, expiration_increment=3600 * 3)
-        print str(r)
+        logger.info(r)
         etc_resources.append_to_log("mturk_conn.extend_hit() returned: " + str(r), repo)
     except Exception as e:
         etc_resources.append_to_log("Exception extending hit: " + str(e), repo)
@@ -116,24 +117,24 @@ def transform_blobs_for_BO(blobs):
 
     return traj, params
 
+
 def set_next_users_parameters(repo, selector, course_id):
+    """@type repo: DataInterface """
     # pass here if not using BO
     if not USE_PSITURK_AND_BAYESIAN_OPT:
-        print "lol"
         return
-    """@type repo: DataInterface """
 
     if DO_BASELINE:
-        #uncomment this to do 1 at a time
-        #if psiturk_hit_check(repo):
-        #    extend_hit(repo)
+        # uncomment this to do 1 at a time
+        # if psiturk_hit_check(repo):
+        # extend_hit(repo)
         extend_hit(repo)
 
     etc_resources.append_to_log("Attempting to set next user's parameters for: " + course_id, repo)
-    print("Attempting to set next user's parameters for: " + course_id + "\n")
+    logger.info("Attempting to set next user's parameters for: " + course_id + "\n")
 
     try:
-        #find current experiment
+        # find current experiment
         exps = repo.get_experiments(course_id)
 
         now = int(time.time())
@@ -144,10 +145,10 @@ def set_next_users_parameters(repo, selector, course_id):
 
         if exp is None:
             etc_resources.append_to_log("NO current experiment found for Bayesian Optimization on course: " + course_id + ". Exiting...", repo)
-            print("WOAH! No current experiment found for Bayesian Optimization\n")
+            logger.info("WOAH! No current experiment found for Bayesian Optimization")
             return
 
-        #get list of skills up in this business
+        # get list of skills up in this business
         skills = repo.get_skills(course_id)
         if 'None' in skills:
             skills.remove('None')
@@ -192,12 +193,11 @@ def run_BO(blobs, course_id):
         traj, params = transform_blobs_for_BO(blobs)
 
         remote_log(HOSTNAME, "Successfully reached BO code\n")
-        print params
+        logger.info(params)
 
         try:
-            print traj
-
-            print params
+            logger.info(traj)
+            logger.info(params)
 
             next_params = bo_edu.next_moe_pts_edu_stateless_boexpt2(traj, params)[0]
 
@@ -239,7 +239,7 @@ def run_BO(blobs, course_id):
                 remote_log(HOSTNAME, "Error retrieving HIT from mturk, exiting loop: " + str(e))
                 return
 
-            print str(hit)
+            logger.info(str(hit))
             remote_log(HOSTNAME, "mturk_conn.get_hit() returned: " + str(hit))
 
             if int(hit.MaxAssignments) >= 9:
@@ -253,19 +253,17 @@ def run_BO(blobs, course_id):
 
             try:
                 r = mturk_conn.extend_hit(hitid, assignments_increment=1)
-                print str(r)
+                logger.info(str(r))
                 remote_log(HOSTNAME, "mturk_conn.extend_hit() returned: " + str(r))
                 r = mturk_conn.extend_hit(hitid, expiration_increment=3600 * 3)
-                print str(r)
+                logger.info(str(r))
                 remote_log(HOSTNAME, "mturk_conn.extend_hit() returned: " + str(r))
             except Exception as e:
                 remote_log(HOSTNAME, "Exception extending hit, loop failed: " + str(e))
 
         except Exception as e:
             remote_log(HOSTNAME, "some other random exception in the loop happened?: " + str(e))
-            print "gg, BO broke."
-            print(str(e) + "\n")
-            print traceback.format_exc()
+            logger.warning("gg, BO broke. {}\n{}".format(str(e), traceback.format_exc()))
             raise e
         finally:
             bo_lock.release()

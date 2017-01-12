@@ -136,8 +136,7 @@ class Problems(Resource):
 
     def post(self, course_id):
         args = problem_parser.parse_args()
-        print "Post problem args:"
-        print args
+        logger.debug("Post problem args: {}".format(args))
         try:
             if args['pretest']:
                 self.repo.post_pretest_problem(course_id, args['skills'], args['problem_name'], args['tutor_url'])
@@ -153,11 +152,11 @@ class Problems(Resource):
 
 experiment_parser = reqparse.RequestParser()
 experiment_parser.add_argument('experiment_name', type=str, location='json', required=True,
-                          help="Please supply the name of the experiment")
+                               help="Please supply the name of the experiment")
 experiment_parser.add_argument('start_time', type=int, location='json', required=True,
-                          help="Please supply the start date in unix seconds")
+                               help="Please supply the start date in unix seconds")
 experiment_parser.add_argument('end_time', type=int, location='json', required=True,
-                          help="Please supply the end date in unix seconds")
+                               help="Please supply the end date in unix seconds")
 
 
 class Experiments(Resource):
@@ -170,7 +169,7 @@ class Experiments(Resource):
         try:
             exps = self.repo.get_experiments(course_id)
         except DataException as e:
-            print("--------------------\tDATA EXCEPTION: " + str(e))
+            logger.exception("Data exception:")
             abort(500, message=str(e))
         return {'experiments': exps}
 
@@ -179,5 +178,5 @@ class Experiments(Resource):
         try:
             self.repo.post_experiment(course_id, args['experiment_name'], args['start_time'], args['end_time'])
         except DataException as e:
-            print("--------------------\tDATA EXCEPTION: " + str(e))
+            logger.exception("Data exception:")
             abort(500, message=str(e))

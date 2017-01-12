@@ -1,17 +1,21 @@
 # misc resources for extra features
+import datetime
+import time
+import thread
 
 from flask_restful import Resource, abort, reqparse
 from flask import Response
 
 from edx_adapt.data.interface import DataException
-from edx_adapt.select.interface import SelectException
 import edx_adapt.misc.psiturk_with_bo
+from edx_adapt import logger
+from edx_adapt.select.interface import SelectException
 
-import time, datetime, thread
 
 bo_parser = reqparse.RequestParser()
 bo_parser.add_argument('parameters', type=dict, required=True, location='json', help="Please supply parameters from BO")
 bo_parser.add_argument('course_id', type=str, required=True, location='json', help="Please supply a course ID")
+
 
 class PostBOParameters(Resource):
     def __init__(self, **kwargs):
@@ -28,16 +32,19 @@ class PostBOParameters(Resource):
 
         return {'success': True}, 200
 
+
 class LoadBOParamsForUser(Resource):
     def __init__(self, **kwargs):
+        """
+        @type repo: DataInterface
+        @type selector: SelectInterface
+        """
         self.repo = kwargs['data']
         self.selector = kwargs['selector']
-        """@type repo: DataInterface"""
-        """@type selector: SelectInterface"""
 
     def get(self, course_id, user_id):
         try:
-            #was anybody else using these?
+            # was anybody else using these?
             prev_users = self.repo.get('NEXT_BO_PARAMS_USERS_' + course_id)
             if len(prev_users) > 0:
                 fin = self.repo.get_finished_users(course_id)
@@ -65,12 +72,15 @@ class LoadBOParamsForUser(Resource):
 hitid_parser = reqparse.RequestParser()
 hitid_parser.add_argument('hitid', type=dict, required=True, location='json', help="Please supply hit ID")
 
+
 class HitID(Resource):
     def __init__(self, **kwargs):
+        """
+        @type repo: DataInterface
+        @type selector: SelectInterface
+        """
         self.repo = kwargs['data']
         self.selector = kwargs['selector']
-        """@type repo: DataInterface"""
-        """@type selector: SelectInterface"""
 
     def post(self):
         try:
@@ -88,13 +98,16 @@ class HitID(Resource):
             abort(500, message=str(e))
         return {'hitid': hitid}, 200
 
-#Because I'm lazy and want to just type in a hitID in a browser without using url params or specifying a post
+
+# Because I'm lazy and want to just type in a hitID in a browser without using url params or specifying a post
 class EZHitIDSetter(Resource):
     def __init__(self, **kwargs):
+        """
+        @type repo: DataInterface
+        @type selector: SelectInterface
+        """
         self.repo = kwargs['data']
         self.selector = kwargs['selector']
-        """@type repo: DataInterface"""
-        """@type selector: SelectInterface"""
 
     def get(self, hitid):
         # This is really a post
@@ -104,7 +117,8 @@ class EZHitIDSetter(Resource):
 log_parser = reqparse.RequestParser()
 log_parser.add_argument('log', type=str, required=True, location='json', help="Please supply something to log")
 
-#utility fn for local use
+
+# utility fn for local use
 def append_to_log(log, repo):
     try:
         old_log = repo.get("__SUMMARY_LOG__")
@@ -114,8 +128,9 @@ def append_to_log(log, repo):
     new_log = old_log + "</br></br>" + timestamp + "</br>" + log
     repo.set("__SUMMARY_LOG__", new_log)
 
-#endpoint for logging events related to the tutor->bayesian optimization->turk->enrollment loop
-#so that we can tell when things go sideways
+
+# endpoint for logging events related to the tutor->bayesian optimization->turk->enrollment loop
+# so that we can tell when things go sideways
 class LoopLog(Resource):
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
@@ -123,7 +138,7 @@ class LoopLog(Resource):
     def post(self):
         try:
             log = log_parser.parse_args()['log']
-            print log
+            logger.info(log)
             append_to_log(log, self.repo)
         except DataException as e:
             abort(500, message=str(e))
@@ -138,6 +153,7 @@ class LoopLog(Resource):
             abort(500, message=str(e))
         return Response(log, mimetype="text/html")
 
+
 class ClearLog(Resource):
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
@@ -148,6 +164,7 @@ class ClearLog(Resource):
         except DataException as e:
             abort(500, message=str(e))
         return {'success': True}, 200
+
 
 class HitChecker5000(Resource):
     def __init__(self, **kwargs):
@@ -161,6 +178,7 @@ class HitChecker5000(Resource):
             return {'message': 'starting...'}, 200
         return {'message': 'no hit extend needed.'}, 200
 
+
 class HitExtendNoBO(Resource):
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
@@ -172,6 +190,7 @@ class HitExtendNoBO(Resource):
             extended = edx_adapt.misc.psiturk_with_bo.extend_hit(self.repo)
             return {'extended': extended}, 200
         return {'message': 'no hit extend needed.', 'extended': False}, 200
+
 
 class BOPoints(Resource):
     def __init__(self, **kwargs):
@@ -189,14 +208,16 @@ class BOPoints(Resource):
                 if e['start_time'] < now and e['end_time'] > now:
                     exp = e
             if exp is None:
-                append_to_log("NO current experiment found for Bayesian Optimization on course: " + course_id + ". Cannot find BO points.", self.repo)
+                append_to_log("NO current experiment found for Bayesian Optimization on course: " + course_id +
+                              ". Cannot find BO points.", self.repo)
                 return {'message': "No experiment found for BO"}, 500
-            #get list of skills up in this business
+            # get list of skills up in this business
             skills = self.repo.get_skills(course_id)
             if 'None' in skills:
                 skills.remove('None')
             users = self.repo.get_subjects(course_id, exp['experiment_name'])
-            blobs = edx_adapt.misc.psiturk_with_bo.get_blobs_with_params(self.repo, self.selector, course_id, users, skills)
+            blobs = edx_adapt.misc.psiturk_with_bo.get_blobs_with_params(self.repo, self.selector, course_id, users,
+                                                                         skills)
             traj, params = edx_adapt.misc.psiturk_with_bo.transform_blobs_for_BO(blobs)
         except DataException as e:
             abort(500, message=str(e))
@@ -207,11 +228,11 @@ class BOPoints(Resource):
         return {'BO_points': points}, 200
 
 
-
 borun_parser = reqparse.RequestParser()
 borun_parser.add_argument('trajectories', type=list, required=True, location='json', help="Please supply previous trajectories")
 
-#endpoint to just run BO
+
+# endpoint to just run BO
 class BORunner(Resource):
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
@@ -224,7 +245,8 @@ class BORunner(Resource):
         thread.start_new_thread(edx_adapt.misc.psiturk_with_bo.run_BO, (trajectories, course_id))
         return {'message': 'starting...'}, 200
 
-#endpoint for admins to hit to start up another BO+Turk loop if things go sideways (as they're want to do)
+
+# endpoint for admins to hit to start up another BO+Turk loop if things go sideways (as they're want to do)
 class LoopRunner(Resource):
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
@@ -234,6 +256,7 @@ class LoopRunner(Resource):
         # not getting anything, just asking for another loop to start
         edx_adapt.misc.psiturk_with_bo.set_next_users_parameters(self.repo, self.selector, course_id)
         return {'message': 'starting...'}, 200
+
 
 class DataExport(Resource):
     def __init__(self, **kwargs):

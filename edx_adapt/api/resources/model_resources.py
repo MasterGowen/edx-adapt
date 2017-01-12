@@ -16,15 +16,17 @@ param_parser.add_argument('params', type=dict, location='json', required=True,
 
 class Parameters(Resource):
     def __init__(self, **kwargs):
+        """
+        @type repo: DataInterface
+        @type selector: SelectInterface
+        """
         self.repo = kwargs['data']
         self.selector = kwargs['selector']
-        """@type repo: DataInterface"""
-        """@type selector: SelectInterface"""
 
     def get(self):
         param_list = []
         try:
-            #get_all_params not even in the interface yet, lol
+            # get_all_params not even in the interface yet, lol
             param_list = self.selector.get_all_parameters()
         except SelectException as e:
             abort(500, message=str(e))

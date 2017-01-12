@@ -8,6 +8,7 @@ import time
 from flask_restful import Resource, abort, reqparse
 
 from edx_adapt.data.interface import DataException
+from edx_adapt import logger
 from edx_adapt.select.interface import SelectException
 
 from edx_adapt.misc import psiturk_with_bo
@@ -21,8 +22,10 @@ class UserProblems(Resource):
     ATTENTION_QUESTION_NAME = 'Pre_assessment_13'
 
     def __init__(self, **kwargs):
+        """
+        @type repo: DataInterface
+        """
         self.repo = kwargs['data']
-        """@type repo: DataInterface"""
 
     def get(self, course_id, user_id):
         nex = {}
@@ -74,18 +77,18 @@ class UserProblems(Resource):
                 # if answer to ATTENTION_QUESTION_NAME is wrong -
                 # then filter out this user, because they are not paying
                 # attention and simply clicking buttons
-                # FIXME(idegtiarov) Not every course has attention question, that is why following checking condition
-                # should be rewrite in more generic way
-                # pretest_done = len(self.repo.get_all_remaining_pretest_problems(course_id, user_id)) == 0
+                pretest_done = len(self.repo.get_all_remaining_pretest_problems(course_id, user_id)) == 0
+                # Disable cut off of students who gave no correct answers at pre-assessment for easier debugging
+                # if pretest_done and (sum( [x['correct'] for x in answers if (x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME) ] ) < 1):
                 # if pretest_done and (
                 #     sum([x['correct'] for x in answers if (
                 #         x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME
-                #     )]) < 1
+                #     )]) < 0
                 # ):
                 #     done_with_course = True
                 #     nex = None
             except DataException as e:
-                print("--------------------\tDATA EXCEPTION: " + str(e))
+                logger.exception("DATA EXCEPTION:")
                 abort(500, message=str(e))
 
         return {
@@ -114,12 +117,13 @@ selector_lock = threading.Lock()
 
 def run_selector(course_id, user_id, selector, repo):
     """
-    Run the problem selection sequence (in separate thread).
+    Run the problem selection sequence (in separate thread)
+
+    :param selector: SelectInterface
+    :param repo: DataInterface
     """
     with selector_lock:
-        """@type selector: SelectInterface
-        @type repo: DataInterface"""
-        # print("--------------------\tSELECTOR LOCK ACQUIRED!")
+        logger.info("SELECTOR LOCK ACQUIRED!")
         nex = None
         try:
             nex = repo.get_next_problem(course_id, user_id)
@@ -130,38 +134,39 @@ def run_selector(course_id, user_id, selector, repo):
         # only run if no next problem has been selected yet, or there was an error previously
         if nex is None or 'error' in nex:
             try:
-                # print("--------------------\tSELECTOR CHOOSING NEXT PROBLEM")
+                logger.info("SELECTOR CHOOSING NEXT PROBLEM")
                 prob = selector.choose_next_problem(course_id, user_id)
-                # print("--------------------\tFINISHED CHOOSING NEXT PROBLEM: ")
-                # print("--------------------\t" + str(prob))
+                logger.info("FINISHED CHOOSING NEXT PROBLEM: {}".format(str(prob)))
                 repo.set_next_problem(course_id, user_id, prob)
             except SelectException as e:
                 # assume that the user/course exists. Set an error...
-                print("--------------------\tSELECTION EXCEPTION OCCURED: " + str(e))
+                logger.exception("SELECTION EXCEPTION OCCURED:")
                 repo.set_next_problem(course_id, user_id, {'error': str(e)})
 
             except DataException as e:
-                print("--------------------\tDATA EXCEPTION HAPPENED, OH NO!" + str(e))
-                #TODO: after deciding if set_next_problem could throw an exception here
+                logger.exception("DATA EXCEPTION HAPPENED, OH NO!")
+                # TODO: after deciding if set_next_problem could throw an exception here
 
         else:
-            print("--------------------\tSELECTION NOT REQUIRED!")
+            logger.info("SELECTION NOT REQUIRED!")
 
 
 class UserInteraction(Resource):
     """
     Post a user's response to their current problem.
+
+    :param repo: DataInterface
+    :param selector: SelectInterface
     """
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
         self.selector = kwargs['selector']
-        """@type repo: DataInterface"""
-        """@type selector: SelectInterface"""
 
     def post(self, course_id, user_id):
         args = result_parser.parse_args()
         if args['unix_seconds'] is None:
             args['unix_seconds'] = int(time.time())
+
         try:
             # If this is a response to the "next" problem, advance to it first before storing
             # (shouldn't happen if PageLoad messages are posted correctly, but we won't require that)
@@ -169,13 +174,13 @@ class UserInteraction(Resource):
             if nex and 'error' not in nex and args['problem'] == nex.get('problem_name'):
                 self.repo.advance_problem(course_id, user_id)
 
-            # TODO: guard against answering other problems...?
-            # possibly outside the scope of this software
+            #TODO: guard against answering other problems...?
+            #possibly outside the scope of this software
 
             self.repo.post_interaction(course_id, args['problem'], user_id, args['correct'],
                                        args['attempt'], args['unix_seconds'])
 
-            # is the user now done? if so hack in a call to psiturk+bo module TODO: do this only once
+            #is the user now done? if so hack in a call to psiturk+bo module TODO: do this only once
             """
             if user_id in self.repo.get_finished_users(course_id):
                 print "USER IS DONE! ONTO BAYESIAN OPTIMIZATION!"
@@ -184,19 +189,19 @@ class UserInteraction(Resource):
 
             # the user needs a new problem, start choosing one
             try:
-                print("--------------------\tSTARTING SELECTOR!")
+                logger.info("STARTING SELECTOR!")
                 """t = threading.Thread(target=run_selector, args=(course_id, user_id, self.selector, self.repo))
                 t.start()
                 t.join()
                 #TODO: actually run in other thread """
                 run_selector(course_id, user_id, self.selector, self.repo)
             except Exception as e:
-                print("--------------------\tEXCEPTION STARTING SELECTION THREAD: " + str(e))
+                logger.exception("EXCEPTION STARTING SELECTION THREAD:")
                 abort(500, message="Interaction successfully stored, but an error occurred starting "
                                    "a problem selection thread: " + e.message)
 
         except DataException as e:
-            print("--------------------\tDATA EXCEPTION: " + str(e))
+            logger.exception("DATA EXCEPTION:")
             abort(500, message=e.message)
 
         return {"success": True}, 200
@@ -210,10 +215,11 @@ load_parser.add_argument('unix_seconds', type=int, help="Optionally supply times
 class UserPageLoad(Resource):
     """
     Post the time when a user loads a problem. Used to log time spent solving a problem.
+
+    :param repo: DataInterface
     """
     def __init__(self, **kwargs):
         self.repo = kwargs['data']
-        """@type repo: DataInterface"""
 
     def post(self, course_id, user_id):
         args = load_parser.parse_args()
@@ -226,7 +232,7 @@ class UserPageLoad(Resource):
             if nex and 'error' not in nex and args['problem'] == nex.get('problem_name'):
                 self.repo.advance_problem(course_id, user_id)
         except DataException as e:
-            print("--------------------\tDATA EXCEPTION: " + str(e))
+            logger.exception("DATA EXCEPTION:")
             abort(500, message=e.message)
 
         return {"success": True}, 200

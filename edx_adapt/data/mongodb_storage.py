@@ -1,10 +1,10 @@
 from json import loads
 from bson import json_util
 from pymongo import MongoClient
-from flask import Response
 
 import interface
 
+from edx_adapt import logger
 
 class MongoDbStorage(interface.StorageInterface):
 
@@ -66,5 +66,5 @@ class MongoDbStorage(interface.StorageInterface):
 
     def _assert_table(self, table_name):
         if table_name not in self.get_tables():
-            print self.get_tables()
+            logger.info(self.get_tables())
             raise interface.DataException("Table does not exist: {}".format(table_name))

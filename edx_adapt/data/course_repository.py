@@ -5,6 +5,8 @@ from datetime import datetime
 import interface
 import random
 
+from edx_adapt import logger
+
 
 class CourseRepository(interface.DataInterface):
     """
@@ -19,11 +21,10 @@ class CourseRepository(interface.DataInterface):
             self.store.create_table(self.generic_table_name, [['key', 'ascending']])
             self.store.set(self.generic_table_name, "MAGIC JOHNSON", "This is the generic store table")
         except interface.DataException as e:
-            print "!!!! Make sure this isn't a problem: " + str(e)
-            print "(Generic table already existing is okay)"
+            logger.exception("(Generic table already existing is okay) Make sure this isn't a problem:")
             pass
 
-        """ Course setup methods """
+    """ Course setup methods """
     def post_course(self, course_id, *args):
         self.store.create_table(course_id)
         self.store.set(course_id, 'users_in_progress', [])
@@ -246,18 +247,18 @@ class CourseRepository(interface.DataInterface):
         l.remove(exp)
         self.store.set(course_id, 'experiments', l)
 
-
     """ General backing store access: allows other modules
     access to persistent storage
     """
     def set(self, key, value):
-        print("--------------------\tGENERIC DB_SET GOING DOWN!")
-        print("--------------------\tKEY: " + str(key))
-        print("--------------------\tVAL: " + str(value))
+        logger.info("GENERIC DB_SET GOING DOWN!")
+        logger.info("KEY: {}".format(str(key)))
+        logger.info("VAL: {}".format(str(value)))
         self.store.set(self.generic_table_name, key, value)
-        print("--------------------\tGENERIC DB_SET DONE!")
+        logger.info("GENERIC DB_SET DONE!")
+
     def get(self, key):
-        print("--------------------\tGENERIC DB_GET GRABBING: " + str(key))
+        logger.info("GENERIC DB_GET GRABBING: {}".format(str(key)))
         return self.store.get(self.generic_table_name, key)
 
     def _get_user_log_key(self, user_id):
@@ -273,8 +274,7 @@ class CourseRepository(interface.DataInterface):
             raise interface.DataException("Problem not found: {}".format(problem_name))
 
         random.shuffle(problem) #hack because joe is tired. shouldn't be multiple problems here anyway
-        print "!~@!@!!$!@#$!@#!!!!!!!!!!!!!!!!!"
-        print problem
+        logger.info(problem)
 
         pret = problem[0]
         if problem_d is not None:
@@ -297,19 +297,6 @@ class CourseRepository(interface.DataInterface):
         all = self.store.get(course_id, 'problems')
         done = self._get_probs_done(course_id, user_id)
         remaining = [x for x in all if x not in done]
-
-        """
-        print "!@#$%!@#!@$%!#@$!@$"
-        for x in all:
-            if 'T3_2' in x['problem_name']:
-                print "ALL LIST T3: "
-                print x
-
-        for x in done:
-            if 'T3_2' in x['problem_name']:
-                print "DONE LIST T3: "
-                print x
-        """
         return remaining
 
     def _get_and_assert_problem_exists(self, course_id, problem_dict):

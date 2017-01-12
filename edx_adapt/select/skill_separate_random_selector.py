@@ -3,6 +3,7 @@ import random
 from interface import SelectInterface, SelectException
 from edx_adapt.data.interface import DataException
 from edx_adapt.model.interface import ModelException
+from edx_adapt import logger
 
 
 class SkillSeparateRandomSelector(SelectInterface):
@@ -37,9 +38,9 @@ class SkillSeparateRandomSelector(SelectInterface):
         """
         super(SkillSeparateRandomSelector, self).__init__(data_interface, model_interface)
 
-        print self.data_interface
-        print self.model_interface
-        print self.model_interface.get_probability_correct
+        logger.info(self.data_interface)
+        logger.info(self.model_interface)
+        logger.info(self.model_interface.get_probability_correct)
 
         self.parameter_access_mode_list.extend(parameter_access_mode.split())
         for mode in self.parameter_access_mode_list:
@@ -65,7 +66,7 @@ class SkillSeparateRandomSelector(SelectInterface):
                 self.data_interface.get_skill_trajectory(course, skill, user), # trajectory of correctness
                 skill_parameter # parameters for the skill
             )
-            print "threshold", skill_parameter['threshold'], 'prob mastery', prob_mastery
+            logger.info("threshold {}, prob mastery {}".format(skill_parameter['threshold'], prob_mastery))
             # If the probability is less than threshold, add the problems to candidate list
             if prob_mastery < skill_parameter['threshold']:
                 new_prob_list.append(prob)
@@ -88,7 +89,7 @@ class SkillSeparateRandomSelector(SelectInterface):
                     for pre_prob in pretest_problems:
                         if pre_prob['problem_name'] == prob:
                             return pre_prob
-                print "This should never print"
+                logger.warning("Something goes wrong while choosing Pretest problem")
                 #return sorted(pretest_problems, key=lambda k: k['problem_name'])[0]
 
             #Do the first 3 baseline problems (if model says to)
@@ -118,7 +119,7 @@ class SkillSeparateRandomSelector(SelectInterface):
                         for post_prob in post:
                             if post_prob['problem_name'] == prob:
                                 return post_prob
-                    print "This should never print"
+                    logger.warning("Something goes wrong while choosing Post test problem")
 
                 if len(post) == 0:
                     return {'congratulations': True, 'done': True}
@@ -136,13 +137,17 @@ class SkillSeparateRandomSelector(SelectInterface):
                 )
                 # If the probability is less than threshold, add the problems to candidate list
                 if prob_correct < skill_parameter['threshold']:
-                    print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~ " + skill_name + " UNDER THRESHOLD! "
-                    print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~ adding candidates: " + str(self.data_interface.get_remaining_problems(course_id, skill_name, user_id))
-                    candidate_problem_list.extend(self.data_interface.get_remaining_problems(course_id, skill_name, user_id))
+                    logger.info("Skill name: {} UNDER THRESHOLD!".format(skill_name))
+                    logger.info("Adding candidates: {}".format(
+                        str(self.data_interface.get_remaining_problems(course_id, skill_name, user_id))
+                    ))
+                    candidate_problem_list.extend(
+                        self.data_interface.get_remaining_problems(course_id, skill_name, user_id)
+                    )
 
-            if candidate_problem_list: # If candidate list is not empty, randomly choose one from it
+            if candidate_problem_list:  # If candidate list is not empty, randomly choose one from it
                 return random.choice(candidate_problem_list)
-            else: # IF candidate list is empty, return post-test
+            else:  # If candidate list is empty, return post-test
                 return self.data_interface.get_all_remaining_posttest_problems(course_id, user_id)[0]
 
         except DataException as e:
