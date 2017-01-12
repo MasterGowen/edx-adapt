@@ -326,7 +326,7 @@ class CourseRepositoryMongo(CourseRepository):
         """
         coll_log = course_id + COLL_SUFFIX['log']
         coll_user_problem = course_id + COLL_SUFFIX['user_problem']
-        self.store.create_table('Courses')
+        self.store.create_table('Courses', index_fields=[['course_id', 'ascending']])
         self.store.create_table(
             coll_log, index_fields=[
                 ['student_id', 'ascending'],
@@ -338,6 +338,7 @@ class CourseRepositoryMongo(CourseRepository):
         self.store.create_table(coll_user_problem, index_fields=[['student_id', 'ascending']])
         data_dict = {
             'course_id': course_id,
+            'model_params': [],
             'users_in_progress': [],
             'users_finished': [],
             'skills': [],
@@ -382,6 +383,37 @@ class CourseRepositoryMongo(CourseRepository):
         coll = course_id + COLL_SUFFIX['user_problem']
         self.store.course_append(course_id, 'users_in_progress', user_id)
         self.store.record_data(coll, {'student_id': user_id, 'current': None, 'next': None})
+
+    def post_model_params(self, course_id, prob_list, new=False):
+        """
+        Add default probability (or set of model_params) student's skills are enrolled with.
+
+        :param course_id: course id
+        :param prob_list: list of dicts with probability parameters: [
+            { "threshold": 0.9, "ps": 0.01, "pi": 0.1, "pg": 0.01, "pt": 0.6},
+            { "threshold": 0.95, "ps": 0.25, "pi": 0.2, "pg": 0.25, "pt": 0.5}
+        ]
+        :param new: boolean flag to mark that old model_params are replaced by new
+        """
+        if isinstance(prob_list, list):
+            self.store.update_doc(
+                'Courses',
+                {'course_id': course_id},
+                {('$set' if new else '$addToSet'): {'model_params': prob_list}},
+                new=new
+            )
+        else:
+            logger.error("Model_params are not given in a list: {}".format(prob_list))
+            raise interface.DataException("Incorrect type of the prob_list parameter")
+
+    def get_model_params(self, course_id):
+        """
+        Return default model_params stored in the database.
+
+        :param course_id: Course ID
+        :return: list of probability parameters
+        """
+        return self.store.course_get(course_id, 'model_params')
 
     def get_skills(self, course_id):
         return self.store.course_get(course_id, 'skills')

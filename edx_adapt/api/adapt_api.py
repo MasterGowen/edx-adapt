@@ -36,6 +36,9 @@ api.add_resource(CR.Problems, base + '/course/<course_id>', base + '/course/<cou
 api.add_resource(CR.Experiments, base + '/course/<course_id>/experiment',
                  resource_class_kwargs={'data': database, 'selector': selector})
 
+api.add_resource(CR.Probabilities, base + '/course/<course_id>/probabilities',
+                 resource_class_kwargs={'data': database, 'selector': selector})
+
 api.add_resource(TR.UserInteraction, base + '/course/<course_id>/user/<user_id>/interaction',
                  resource_class_kwargs={'data': database, 'selector': selector})
 api.add_resource(TR.UserProblems, base + '/course/<course_id>/user/<user_id>',
@@ -62,6 +65,9 @@ api.add_resource(
 )
 
 api.add_resource(MR.Parameters, base+'/parameters',
+                 resource_class_kwargs={'data': database, 'selector': selector})
+
+api.add_resource(MR.ParametersBulk, base+'/parameters/bulk',
                  resource_class_kwargs={'data': database, 'selector': selector})
 
 api.add_resource(ER.HitID, base+'/misc/hitID',

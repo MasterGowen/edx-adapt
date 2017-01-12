@@ -125,16 +125,15 @@ def main():
                 headers=headers
             )
             print("student {} is enrolled in course {}".format(student_id, parameters['course_id']))
-            for skill in parameters['skills']:
-                payload = {
-                    'course_id': parameters['course_id'],
-                    'params': parameters['probabilities'],
-                    'user_id': student_id,
-                    'skill_name': skill
-                }
-                requests.post(
-                    'http://{host}:{port}/api/v1/parameters'.format(**parameters), json=payload, headers=headers
-                )
+            payload = {
+                'course_id': parameters['course_id'],
+                'params': parameters['probabilities'],
+                'user_id': student_id,
+                'skills_list': parameters['skills']
+            }
+            requests.post(
+                'http://{host}:{port}/api/v1/parameters/bulk'.format(**parameters), json=payload, headers=headers
+            )
             print("student's skill are added")
 
 

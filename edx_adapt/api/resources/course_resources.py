@@ -180,3 +180,36 @@ class Experiments(Resource):
         except DataException as e:
             logger.exception("Data exception:")
             abort(500, message=str(e))
+
+prob_parser = reqparse.RequestParser()
+prob_parser.add_argument('prob_list', type=list, location='json', help="Please supply list with default model_params")
+
+
+class Probabilities(Resource):
+    def __init__(self, **kwargs):
+        self.repo = kwargs['data']
+
+    def get(self, course_id):
+        prob_list = []
+        try:
+            prob_list = self.repo.get_model_params(course_id)
+        except DataException as e:
+            abort(404, message=str(e))
+
+        return {'model_params': prob_list}, 200
+
+    def post(self, course_id):
+        args = prob_parser.parse_args()
+        try:
+            self.repo.post_model_params(course_id, args['prob_list'], new=True)
+        except DataException as e:
+            abort(500, message=str(e))
+        return {'success': True}, 201
+
+    def put(self, course_id):
+        args = prob_parser.parse_args()
+        try:
+            self.repo.post_model_params(course_id, args['prob_list'])
+        except DataException as e:
+            abort(500, message=str(e))
+        return {'success': True}, 201
