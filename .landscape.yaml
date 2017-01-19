@@ -2,3 +2,5 @@ strictness: veryhigh
 autodetect: true
 python-targets:
   - 2
+uses:
+  - flask
