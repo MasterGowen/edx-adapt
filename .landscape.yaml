@@ -1,0 +1,4 @@
+strictness: veryhigh
+autodetect: true
+python-targets:
+  - 2
