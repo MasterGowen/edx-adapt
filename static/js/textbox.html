@@ -12,6 +12,35 @@
             return vars;
         }
 
+        function disableNavButtons(){
+            var nextButtons = window.parent.document.getElementsByClassName('button-next');
+            var previousButtons = window.parent.document.getElementsByClassName('button-previous');
+            var i;
+            for (i = 0; i < nextButtons.length; i ++){
+                nextButtons[i].classList.add('disabled');
+                nextButtons[i].setAttribute('disabled', 'disabled');
+                previousButtons[i].classList.add('disabled');
+                previousButtons[i].setAttribute('disabled', 'disabled');
+            }
+        }
+
+        function enableNextButtons(problemLink) {
+            var nextButtons = window.parent.document.getElementsByClassName('sequence-nav-button button-next');
+            var i;
+            nextButtons.forEach( function(nextButton) {
+                nextButton.classList.remove('disabled');
+                nextButton.removeAttribute('disabled', 'disabled');
+                var clone = nextButton.cloneNode();
+                while (nextButton.firstChild) {
+                  clone.appendChild(nextButton.lastChild);
+                }
+                nextButton.parentNode.replaceChild(clone, nextButton);
+                nextButton.addEventListener('click', function(event){
+                    window.top.location.replace(problemLink);
+                }, false);
+            });
+        }
+
         vars = getUrlVars();
         showLink = (vars['showlink'] == 'true' || vars['showlink'] == 'True' || vars['showlink'] == 'yes');
         showComplete = (vars['completed'] == 'true' || vars['completed'] == 'True' || vars['completed'] == 'yes');
@@ -53,9 +82,7 @@
             if(e.detail.complete)
             {
 
-                document.getElementById('completed').innerHTML = '<button style="border-radius: 5px" height="50"
-                onclick="window.top.location.replace(\'' + e.detail.link +'\')"><font size="4">Please click here to go on to the next problem.</font></button>';
-                resizeIframe();
+                enableNextButtons(e.detail.link);
 
                 if(e.detail.done_with_course && edx_adapt.get_problem_name().indexOf('Pre_as') > -1)
                 {
@@ -87,6 +114,7 @@
     <p id="text" style="font-family:verdana">Loading content. Please wait...</p>
 
     <script>
+        disableNavButtons();
         vars = getUrlVars();
         if(showComplete)
         {
