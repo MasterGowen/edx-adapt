@@ -79,7 +79,8 @@ class MongoDbStorage(interface.StorageInterface):
         :param field_name: string Field of required data
         :return: data from the field
         """
-        return self.db.Courses.find_one({'course_id': course_id, field_name: {'$exists': True}})[field_name]
+        doc = self.db.Courses.find_one({'course_id': course_id, field_name: {'$exists': True}})
+        return doc[field_name] if doc else None
 
     def course_search(
         self, course_id, search_field, search_condition, projection_field=None, projection_condition=None
@@ -104,16 +105,17 @@ class MongoDbStorage(interface.StorageInterface):
             return self.db.Courses.find_one({'course_id': course_id, search_field: {'$elemMatch': search_condition}},
                                             {'_id': 0, projection_field: {'$elemMatch': projection_condition}})
 
-    def update_doc(self, collection, search_dict, update_dict):
+    def update_doc(self, collection, search_dict, update_dict, new=False):
         """
         Update document in collection
 
         :param collection: name of the collection
         :param search_dict: dict for match stage in update query
         :param update_dict: dict for update stage in update query
+        :param new: boolean flag mark to upsert document
         :return: None
         """
-        self.db[collection].update_one(search_dict, update_dict)
+        self.db[collection].update_one(search_dict, update_dict, upsert=new)
 
     def set(self, coll_name, key, val):
         """
@@ -179,7 +181,9 @@ class MongoDbStorage(interface.StorageInterface):
             {'course_id': course_id, field_key: {'$exists': True}}, {'$addToSet': {field_key: value}}
         )
         if not update_res.modified_count:
-            logger.info("Key {0} is not exists in course {1} document fields".format(field_key, course_id))
+            logger.info("Key {0} does not exists in the course {1} or value {2} is already in the document".format(
+                field_key, course_id, value
+            ))
 
     def course_user_done(self, course_id, user_id):
         """
@@ -233,5 +237,6 @@ class MongoDbStorage(interface.StorageInterface):
                  get_from_doc if get_from_doc else '$ROOT')}}}]
         )
         if not logs.alive:
-            raise interface.DataException("Student {} logs are not found".format(user_id))
+            logger.warning("Student {} logs are not found".format(user_id))
+            return []
         return logs.next()[group_field]
