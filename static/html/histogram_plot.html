@@ -1,0 +1,36 @@
+<html>
+<head>
+  <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+	<script type="text/javascript">
+	  google.load("visualization", "1", {packages:["corechart"]});
+	  google.setOnLoadCallback(drawChart);
+
+	  // get data and titles from problem
+	  gx = parent.document.getElementById('graphX1');
+	  the_title = gx.getAttribute('title');
+	  haxis_title = gx.getAttribute('htitle');
+	  haxis_min = gx.getAttribute('hmin');
+	  haxis_max = gx.getAttribute('hmax');
+	  bucket_size = gx.getAttribute('bucket_size');
+	  data_str = gx.getAttribute('data');		// should be a JSON string
+	  data_array = eval(data_str);
+
+	  console.debug('data string:');
+		console.debug(data_str);
+
+	  function drawChart() {
+		var data = google.visualization.arrayToDataTable(data_array);
+		var options = {
+		  title: the_title,
+		  tooltip: {trigger: 'none'},
+		  legend: {position: 'none'},
+		};
+		var chart = new google.visualization.Histogram(document.getElementById('chart_div'));
+		chart.draw(data, options);
+	  }
+	</script>
+</head>
+<body>
+	<div id="chart_div" style="width: 800px; height: 500px"></div>
+</body>
+</html>

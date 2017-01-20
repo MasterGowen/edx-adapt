@@ -6,8 +6,7 @@
 
     //Connection information
     edx_adapt.apistr    = '/api/v1';
-    edx_adapt.server    = '52.210.53.36';
-    edx_adapt.apiport   = '8080';
+    edx_adapt.server    = 'https://edx-adapt-dev.raccoongang.com';
 
     edx_adapt.course_id = $(".xmodule_display", window.parent.document).attr('data-course-id');
 
@@ -23,7 +22,7 @@
 
         //Post student's attempt to the server log
         $.ajax({
-            url: "http://" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user + '/interaction',
+            url: "//" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user + '/interaction',
             type: "POST",
             contentType: "application/json",
             data: JSON.stringify(data),
@@ -47,7 +46,7 @@
 
         data = {'problem': problem};
         $.ajax({
-            url: "http://" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user + '/pageload',
+            url: "//" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user + '/pageload',
             type: "POST",
             contentType: "application/json",
             data: JSON.stringify(data),
@@ -135,7 +134,7 @@
 
         //check server for user status
         $.ajax({
-            url: "http://" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user,
+            url: "//" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user,
             type: "GET",
             success: function (data) {
 
@@ -224,7 +223,7 @@
         }
 
         $.ajax({
-            url: "http://" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user,
+            url: "//" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user,
             type: "GET",
             success: function (data) {
                 //data = JSON.parse(data)

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.bar rect {
+  fill: steelblue;
+  shape-rendering: crispEdges;
+}
+
+.bar text {
+  fill: #fff;
+}
+
+.axis path, .axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+</style>
+<body>
+
+<div id="err">Loading content. Please wait...</div>
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+<script src="//edx-adapt-dev.raccoongang.com/static/js/server_interaction.js" type="text/javascript"></script>
+<script src="//d3js.org/d3.v2.min.js?2.10.0"></script>
+<script>
+
+//ask if we're on the right problem
+//but not if the magic is happening!
+vars = getUrlVars();
+if(vars["div"] == "magic") {
+	document.getElementById('err').innerHTML = '';
+	drawHistogram();
+}
+else {
+	document.addEventListener("display_problem_request", display_problem_callback);
+	document.addEventListener("display_problem_request_error", display_problem_error_callback);
+	window.edx_adapt.display_problem_request(vars['user_id'], edx_adapt.get_problem_name());
+}
+
+//Callbacks from display_problem_request()
+function display_problem_callback(e)
+{
+	document.getElementById('err').innerHTML = '';
+	if (e.detail.display == true)
+		drawHistogram();
+}
+
+function display_problem_error_callback(e)
+{
+	document.getElementById('err').innerHTML = "Error connecting to RL server, panic wildly then notify somebody. " + e.detail.err + "</br>" +  e.detail.textStatus;
+}
+
+
+function drawHistogram()
+{
+	vars = getUrlVars();
+	//assume we'll always have the div...
+	gx = parent.document.getElementById(vars["div"]);
+	mean = 100.0;
+	year = 1984;
+	std = 10.0;
+	yheight = 100;
+	numPoints=300;
+	skewed = 0;
+	numberOfBins = 50;
+	datastr = "";
+	mind = 0;
+	maxd = 0;
+	rectwidthhack = 0;
+	ytick = -1;
+	xtick = -1;
+	unifProb = 0;
+	unifOnly = 0;
+	xlabel = "Score Difference";
+	ylabel = "Frequency";
+	title = "";
+	showXAxis = 1;
+	showYAxis = 1;
+	windowWidth = 600;
+	windowHeight = 250;
+	iframeID = "";
+	showNumber = 0;
+	bimodal = 0;
+
+
+	if( gx.hasAttribute('mean') )
+	{
+		mean = parseFloat(gx.getAttribute('mean'));
+	}
+	if( gx.hasAttribute('wWidth') )
+	{
+		windowWidth = parseFloat(gx.getAttribute('wWidth'));
+	}
+	if( gx.hasAttribute('wHeight') )
+	{
+		windowHeight = parseFloat(gx.getAttribute('wHeight'));
+	}
+	if( gx.hasAttribute('mean') )
+	{
+		mean = parseFloat(gx.getAttribute('mean'));
+	}
+	if( gx.hasAttribute('numPoints') )
+	{
+		numPoints = parseFloat(gx.getAttribute('numPoints'));
+	}
+	if( gx.hasAttribute('year') )
+	{
+		year = gx.getAttribute('year');
+	}
+	if( gx.hasAttribute('std') )
+	{
+		std = parseFloat(gx.getAttribute('std'));
+	}
+	if( gx.hasAttribute('bins') )
+	{
+		numberOfBins = parseInt(gx.getAttribute('bins'));
+	}
+	if( gx.hasAttribute('skew') )
+	{
+		skewed = parseInt(gx.getAttribute('skew'));
+	}
+	if( gx.hasAttribute('data') )
+	{
+		datastr = gx.getAttribute('data');
+	}
+	if( gx.hasAttribute('min') )
+	{
+		mind = parseInt(gx.getAttribute('min'));
+	}
+	if( gx.hasAttribute('max') )
+	{
+		maxd = parseInt(gx.getAttribute('max'));
+	}
+	if( gx.hasAttribute('height') )
+	{
+		yheight = parseInt(gx.getAttribute('height'));
+	}
+	if( gx.hasAttribute('ytick') )
+	{
+		ytick = parseInt(gx.getAttribute('ytick'));
+	}
+	if( gx.hasAttribute('xtick') )
+	{
+		xtick = parseInt(gx.getAttribute('xtick'));
+	}
+	if( gx.hasAttribute('unifProb') )
+	{
+		unifProb = parseInt(gx.getAttribute('unifProb'));
+	}
+	if( gx.hasAttribute('unifOnly') )
+	{
+		unifOnly = parseInt(gx.getAttribute('unifOnly'));
+	}
+	if( gx.hasAttribute('xlabel') )
+	{
+		xlabel = gx.getAttribute('xlabel');
+	}
+	if( gx.hasAttribute('ylabel') )
+	{
+		ylabel = gx.getAttribute('ylabel');
+	}
+	if( gx.hasAttribute('title') )
+	{
+		title = gx.getAttribute('title');
+	}
+	else
+	{
+		title = "Difference in Game Points: " + year;
+	}
+	if( gx.hasAttribute('showxaxis') )
+	{
+		showXAxis = parseInt(gx.getAttribute('showxaxis'));
+	}
+	if( gx.hasAttribute('showyaxis') )
+	{
+		showYAxis = parseInt(gx.getAttribute('showyaxis'));
+	}
+	if( gx.hasAttribute('windowwidth') )
+	{
+		windowWidth = parseInt(gx.getAttribute('windowwidth'));
+	}
+	if( gx.hasAttribute('windowheight') )
+	{
+		windowHeight = parseInt(gx.getAttribute('windowheight'));
+	}
+	if( gx.hasAttribute('iframeid') )
+	{
+		iframeID = gx.getAttribute('iframeid');
+	}
+	if( gx.hasAttribute('shownumber') )
+	{
+		showNumber = parseInt(gx.getAttribute('shownumber'));
+	}
+	if( gx.hasAttribute('bimodal') )
+	{
+		bimodal = parseInt(gx.getAttribute('bimodal'));
+	}
+
+
+	var values;
+
+	if(datastr != "")
+	{
+		//if we sent in data, graph it
+		values = JSON.parse(datastr);
+	}
+	else
+	{
+		if(bimodal != 0) {
+		  randFunc = getBimodalDist(mind, maxd);
+		}
+		//otherwise generate data
+		else if(skewed != 0)
+		{
+		 // generate a chi distribution
+		 randFunc = getChiDist(mean, std, skewed);
+		}
+		else
+		{
+		 // Generate a log-normal distribution with a median of 30 minutes.
+		 randFunc = d3.random.normal(mean,std);
+		}
+		values = d3.range(numPoints).map(addUnifDist(randFunc, unifProb, mind, maxd));
+
+	}
+
+	var formatCount = d3.format(",.0f");
+
+	var margin = {top: 30, right: 30, bottom: 40, left: 20},
+		width = windowWidth - margin.left - margin.right,
+		height = windowHeight - margin.top - margin.bottom;
+
+	var x;
+	if(datastr != "" || (mind != 0 || maxd != 0) )
+	{
+		x = d3.scale.linear()
+		.domain([mind, maxd+1])
+		.range([0, width]);
+		rectwidthhack = 1;
+	}
+	else
+	{
+		x = d3.scale.linear()
+		.domain([60, 140])
+		.range([0, width]);
+	}
+	// Generate a histogram using twenty uniformly-spaced bins.
+	var data;
+	if (numberOfBins == 1){
+		data = d3.layout.histogram()
+			.bins([mind,maxd + 1])
+			(values);
+	}
+	else if (numberOfBins == 2){
+		max = maxd + 1;
+		data = d3.layout.histogram()
+			.bins([mind,(mind + max)/2,max])
+			(values);
+	}
+	else {
+		data = d3.layout.histogram()
+			.bins(x.ticks(numberOfBins))
+			(values);
+	}
+
+	var y = d3.scale.linear()
+		.domain([0, yheight])
+		.range([height, 0]);
+
+	var xAxis = d3.svg.axis()
+		.scale(x)
+		.orient("bottom")
+
+	if(xtick >= 0) xAxis.ticks(xtick);
+
+	var yAxis = d3.svg.axis()
+		.scale(y)
+		.orient("left")
+
+	if(ytick >= 0) yAxis.ticks(ytick);
+
+	var svg = d3.select("body").append("svg")
+		.attr("width", width + margin.left * 2 + margin.right)
+		.attr("height", height + margin.top + margin.bottom)
+		.append("g")
+		.attr("transform", "translate(" + margin.left * 2 + "," + margin.top + ")");
+		// .attr("transform", "translate(0," + margin.top + ")");
+
+	var bar = svg.selectAll(".bar")
+		.data(data)
+		.enter().append("g")
+		.attr("class", "bar")
+		.attr("transform", function(d) { return "translate(" + x(d.x) + "," + y(d.y) + ")"; });
+
+	bar.append("rect")
+		.attr("x", 1)
+		.attr("width", width/numberOfBins - rectwidthhack)
+		.attr("height", function(d) { return height - y(d.y); })
+
+	if(showNumber == 1) {
+		bar.append("text")
+			.attr("dy", ".75em")
+			.attr("y", -10)
+			.attr("x", x(data[0].dx + mind) / 2)
+			.attr("text-anchor", "middle")
+			.style("fill", "black")
+			.style("stroke", "black")
+			.text(function(d) { return formatCount(d.y); });
+	}
+	svg.append("text")
+		.attr("x", (width / 2))
+		.attr("y", 0 - (margin.top / 2))
+		.attr("text-anchor", "middle")
+		.style("font-size", "16px")
+		.text(title);
+
+	svg.append("g")
+		.attr("class", "x axis")
+		.attr("transform", "translate(0," + height + ")")
+		.call(xAxis);
+
+	if(showXAxis == 1) {
+		svg.append("text")
+			.attr("x", (width / 2))
+			.attr("y", height + margin.bottom - 5)
+			.attr("text-anchor", "middle")
+			.style("font-size", "14px")
+			.text(xlabel);
+	}
+
+	svg.append("g")
+		.attr("class", "y axis")
+		.call(yAxis);
+
+	if(showYAxis == 1) {
+		svg.append("text")
+			.attr("class", "y label")
+			.attr("font-size","14px")
+			.attr("text-anchor", "end")
+			.attr("y", -40)
+			.attr("x", -10)
+			.attr("dy", ".75em")
+			.attr("transform", "rotate(-90)")
+			.text(ylabel);
+	}
+
+	if(iframeID != "") resizeIframe(iframeID);
+}
+
+function getUrlVars() {
+	var vars = {};
+	var parts = document.URL.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
+		vars[key] = value;
+	});
+	return vars;
+}
+
+function getChiDist(mean, std, skew) {
+	return function() {
+		if(skew < 0) chi = -1 * d3.random.logNormal(0,0.5)() + 1;
+		else chi = d3.random.logNormal(0,0.5)() - 1;
+		chi = chi * std * 3 + mean;
+		return chi;
+	}
+}
+
+function getBimodalDist(min, max) {
+	return function() {
+		randomf = d3.random.normal(0,(max - min)/10);
+		if(Math.random()>0.7) return min + Math.abs(randomf());
+		else return max - Math.abs(randomf());
+	}
+}
+
+function addUnifDist(randFunc, unifProb, min, max) {
+	return function() {
+		if(Math.random() < unifProb / 100) {
+			return Math.random() * (max - min) + min;
+		} else {
+			return randFunc();
+		}
+	}
+}
+
+function resizeIframe(iframeID) {
+  height = document.body.offsetHeight + 10;
+  window.parent.document.getElementById(iframeID).height = height + 'px';
+}
+</script>

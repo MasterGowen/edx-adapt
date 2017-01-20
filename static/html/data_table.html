@@ -1,0 +1,109 @@
+<html>
+<head>
+<style>
+table, tr, td {
+			border: 1px solid black;
+			border-collapse: collapse;
+			text-align: justify;
+		}
+		td {
+			padding-right: 5px;
+			padding-left: 8px;
+			padding-top: 2px;
+			padding-bottom: 2px;
+			height: 22px;
+			width: 75px;
+			text-align: justify;
+		}
+		p {
+			line-height: 150%;
+			text-align: justify;
+		}
+		table { padding: 0px; }
+	</style>
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+	<script src="//edx-adapt-dev.raccoongang.com/static/js/server_interaction.js" type="text/javascript"></script>
+    <script type="text/javascript">
+	function getUrlVars() {
+		var vars = {};
+		var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
+			vars[key] = value;
+		});
+		return vars;
+	}
+
+	function resizeIframe() {
+	  height = document.getElementById('all').offsetHeight + 25;
+	  window.parent.document.getElementById("table_form").height = height + 'px';
+	}
+
+	function createTable(tablename) {
+		dbg = document.getElementById("dbg");
+		table = document.getElementById(tablename);
+
+		vars = getUrlVars(this.location.href);
+		console.log(vars);
+		console.log(vars["data"]);
+
+		data = parent.document.getElementById(vars["data"]);
+		//labelstring = vars["labels"];
+
+		data_matrixs = data.getAttribute('data');
+		data_matrix = JSON.parse(data_matrixs);
+
+		var tableHTML = "<table>";
+
+		tableHTML += "<tr><td> </td><td>Celtics</td><td>Nets</td><td>Knicks</td><td>76ers</td><td>Raptors</td><td>Bulls</td><td>Cavaliers</td><td>Pistons</td></tr>";
+
+		teams = ['Rockets','Magic','Lakers','Blazers'];
+
+		for (row in data_matrix)
+		{
+			var rowlabel = parseInt(row)+1;
+			tableHTML += "<tr> <td style=\"width:130px\">"+teams[rowlabel-1]+"</td>";
+			for (col in data_matrix[row])
+			{
+				tableHTML += "<td>" + data_matrix[row][col] + "</td>";
+			}
+			tableHTML += "</tr>";
+		}
+		tableHTML += "</table>";
+		table.innerHTML = tableHTML;
+	}
+
+	function display_problem_callback(e)
+	{
+		if (e.detail.display == true)
+		{
+			//We're in the right place, display the problem
+			createTable("table");
+			resizeIframe();
+		} else {
+			resizeIframe();
+		}
+	}
+
+	function display_problem_error_callback(e)
+	{
+		document.getElementById('form').innerHTML = "Error connecting to RL server, panic wildly then notify somebody. " + e.detail.err;
+		resizeIframe();
+	}
+
+    </script>
+</head>
+<body>
+	<div id="all">
+	<p id="dbg"></p>
+	<p id="table"></p>
+
+	<script type="text/javascript">
+		vars = getUrlVars();
+		document.addEventListener("display_problem_request", display_problem_callback);
+		document.addEventListener("display_problem_request_error", display_problem_error_callback);
+		window.edx_adapt.display_problem_request(vars['user_id'], edx_adapt.get_problem_name());
+
+	</script>
+
+	</div>
+</body>
+</html>

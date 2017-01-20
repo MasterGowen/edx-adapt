@@ -3,11 +3,12 @@ from flask import Flask
 from flask.ext.cors import CORS
 from flask_restful import Api
 # import API resources
-import resources.course_resources as CR
-import resources.tutor_resources as TR
-import resources.data_serve_resources as DR
-import resources.model_resources as MR
-import resources.etc_resources as ER
+import edx_adapt.api.resources.course_resources as CR
+import edx_adapt.api.resources.tutor_resources as TR
+import edx_adapt.api.resources.data_serve_resources as DR
+import edx_adapt.api.resources.model_resources as MR
+import edx_adapt.api.resources.etc_resources as ER
+# import data and model stuff
 import edx_adapt.data.course_repository as repo
 import edx_adapt.data.mongodb_new_storage as mongodbstore
 import edx_adapt.select.skill_separate_random_selector as select

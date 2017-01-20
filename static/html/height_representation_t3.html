@@ -1,0 +1,87 @@
+<html>
+  <head>
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+	<script src="//edx-adapt-dev.raccoongang.com/static/js/server_interaction.js" type="text/javascript"></script>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+      function getUrlVars() {
+		var vars = {};
+		var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
+			vars[key] = value;
+		});
+		return vars;
+	  }
+
+	  google.load("visualization", "1", {packages:["corechart"]});
+	  google.setOnLoadCallback(drawChart);
+
+	  function resizeIframe() {
+		height = document.getElementById('all').offsetHeight + 25;
+		//window.parent.document.getElementById("folding_data").height = height + 'px';
+	  }
+
+	  function drawChart() {
+		var data = google.visualization.arrayToDataTable([
+		  ['Score Difference'],
+		  [81], [79],  [76],  [76],   [75],
+		  [74],  [73],   [73],  [73],  [72],
+		  [71], [71],  [71], [70],  [70],
+		  [69], [66], [66], [65],   [65],
+		  [64], [63],  [61],   [61],   [50],
+		  ]);
+
+		var options = {
+		  title: "Folding Data",
+		  histogram : { bucketSize: 5},
+		  vAxis : { ticks : [5,10,15] },
+		  legend: { position: 'none' },
+		  hAxis : { title : "Overall Score"},
+		  vAxis : { title : "Frequency"},
+		  chartArea : {left : 50,
+					   top : 10,
+					   width :'65%',
+					   height: 400},
+		};
+
+		var test = document.getElementById('chart_div');
+		var test2 = document.getElementById('text');
+
+		var chart = new google.visualization.Histogram(document.getElementById('chart_div'));
+		chart.draw(data, options);
+
+	  }
+
+
+	function display_problem_callback(e)
+	{
+		if (e.detail.display == true) {
+			//We're in the right place, display the problem
+			document.getElementById('text').innerHTML = '';
+		} else {
+			//don't display anything!
+			document.getElementById('text').innerHTML = '';
+			document.getElementById('chart_div').innerHTML = '';
+		}
+	}
+
+	function display_problem_error_callback(e)
+	{
+		document.getElementById('text').innerHTML = "Error connecting to RL server, panic wildly then notify somebody. " + e.err;
+	}
+
+
+    </script>
+  </head>
+  <body>
+	<div id="all">
+		<div id="chart_div" style="width: 800px; height: 500px;"></div>
+		<div id="text">Loading content. Please wait...</div>
+		<script>
+		vars = getUrlVars();
+			document.addEventListener("display_problem_request", display_problem_callback);
+			document.addEventListener("display_problem_request_error", display_problem_error_callback);
+			window.edx_adapt.display_problem_request(vars['user_id'], edx_adapt.get_problem_name());
+		</script>
+    </div>
+  </body>
+</html>

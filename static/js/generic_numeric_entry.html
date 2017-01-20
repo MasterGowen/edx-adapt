@@ -1,3 +1,4 @@
+
 <html>
 
 <style>
@@ -28,10 +29,9 @@
 		function getUrlVars() {
 		  var vars = {};
 		  var url = document.URL;
-		  url = url.replace('%24', '&');
-		  url = url.replace('%3D', '=');
-
-		  var parts = url.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
+		  url = url.split('%24').join('$');
+		  url = url.split('%3D').join('=');
+		  var parts = url.replace(/[?&$]+([^=$]+)=([^$]*)/gi, function(m,key,value) {
 			vars[key] = value;
 		  });
 		  return vars;
@@ -45,19 +45,27 @@
 		*/
 		state = {
 			//is the student's answer correct? (possibly a misnomer... eh)
-			//required for grading the problem
+				//required for grading the problem
 			'correct_answer' : false,
-			//which choice is the answer?
+			//what is the answer?
 			'answer' : -1,
-			//list of users answer choices
-			//required to repopulate the form
-			'inputs' : [],
+			//tolerance?
+			'tol' : 0,
+			//user input
+				//required to repopulate the form so users don't shit bricks
+			'input' : 0,
 			//attempts at the problem (how many times getGrade() has been called)
-			//required for our adaptive hints
+				//required for our adaptive hints
 			'attempts' : 0,
-			//number of choices
-			'choices' : 0
+
+			//screw form submissions
+			'vars' : {}
 		};
+
+		function foo(e){
+			var no_op = 0;
+			return false;
+		}
 
 		//global variable that is set once the form is displayed.
 		//If this is false we can't access the form's document elements,
@@ -65,95 +73,50 @@
 		displayed = false;
 
 		//url variables
-		vars = {};
+		vars = getUrlVars();
 
-		//just stupid rewrapping the url vars into a global variable
-		function getVars() {
-			vars = getUrlVars();
-		}
-
-		//Compose answer strings for form creation
-		function composeAnswerStringList(div) {
-			var answerlist = [];
-			var row;
-			for (row = 0; row < state['choices']; row++) {
-				var formstring = '';
-				formstring += '<input type="radio" name = "ans" id="ans'+row.toString();
-				formstring += '" onkeypress= "setTimeout(check_answers, 250)"/>';
-				if(div.hasAttribute('choice'+row.toString()))
-				{
-					formstring += div.getAttribute('choice'+row.toString()) + '<br>';
-				}
-				else
-					formstring += '<i>no answer</i><br/>';
-				answerlist.push(formstring);
-			}
-			return answerlist;
-		}
-
-		//Shuffle answerlist items in composed form for answers input: [srting1, string2, string3];
-		//output: string3 + string1 + string2
-		function shuffleString(iterObject) {
-			var steps;
-			var temp = iterObject.slice(0);
-			var cacheString = '';
-			for (steps = iterObject.length; steps > 0; steps--) {
-				var rand = Math.floor(Math.random() * steps);
-				cacheString += temp.splice(rand, 1);
-			}
-			return cacheString;
-		}
 
 		//Creates the form where users input data. Super simple
 		function createForm(divname) {
 			var div = parent.document.getElementById(vars['div']);
-			state['choices'] = parseInt(div.getAttribute('choices'));
-			var prompt = '';
-			if(div.hasAttribute('text'))
-			{
-				prompt = div.getAttribute('text') + '<br>';
-			}
-			var formstring = prompt + '<form>';
-			var answerlist = composeAnswerStringList(div);
-			formstring += shuffleString(answerlist);
-			formstring += '</form>';
+
+			var text = div.getAttribute('text');
+
+			var formstring = text;// + '<br><form onsubmit="foo">'
+			formstring += '<input type="text" id="ans" onkeypress="foo"/>';
+			//formstring += '</form>';
 
 			var form = document.getElementById(divname);
 			form.innerHTML = formstring;
 		}
 
-		//checks to see if input == answers
-		//This runs whenever a user types a number into the form, and when getGrade() runs
-		function ckeckAnswers(){
+		//checks to see if input == answer
+		//This runs when getGrade() runs
+		function check_answers(){
 			if(!displayed)
 				return; //cannot check the form if it doesn't exist
 
-			var correct = false;
-			var c;
-			for(c = 0; c < state['choices']; c++)
-			{
-				var idstring = "ans"+c.toString();
-				var ans = document.getElementById(idstring).checked;
-				if(ans)
-					state['inputs'][c] = 1;
-				else
-					state['inputs'][c] = 0;
+			var ans_str = document.getElementById("ans").value;
+			var ans = parseInt(ans_str);
+			state['input'] = ans;
 
-				if(state['answer'] == c)
-					correct = ans;
-			}
-			state['correct_answer'] = correct;
+			if(ans >= state['answer'] - state['tol'] && ans <= state['answer'] + state['tol'])
+				state['correct_answer'] = true;
+			else
+				state['correct_answer'] = false;
 		}
 
 		//create list for checkbox states and set correct answer
 		function createAnswers(){
-			var c;
-			for(c = 0; c < state['choices']; c++)
-			{
-				state['inputs'].push(0);
-			}
+			if($.isEmptyObject(vars))
+				vars = state['vars'];
+			else
+				state['vars'] = vars;
+
 			var div = parent.document.getElementById(vars['div']);
 			state['answer'] = parseInt(div.getAttribute('answer'));
+			if(div.hasAttribute('tol'))
+				state['tol'] = parseInt(div.getAttribute('tol'));
 		}
 
 		//This executes when the user hits "Check"
@@ -161,7 +124,7 @@
 		//but for simplicity, we're gonna throw the whole state back
 		function getGrade(){
 			//first, make sure we have current knowledge of whether the answer is correct
-			ckeckAnswers();
+			check_answers();
 			//then add 1 to the attempt counter
 			state['attempts'] += 1;
 			//notify problem server of the student's attempt + grade
@@ -182,27 +145,20 @@
 		}
 
 		//fill form in with inputs from state
-		function repopulateForm()
+		function repopulate_form()
 		{
-			var c;
-			var len = state['inputs'].length;
-			for(c = 0; c < len; c++)
-			{
-				var idstring = "ans"+c.toString();
-				var input = document.getElementById(idstring);
+			if(!displayed)
+				return;
 
-				if(state['inputs'][c] && displayed) //cannot set inputs if they don't exist
-					input.checked = true;
-
-			}
+			document.getElementById("ans").value = state['input'].toString();
 		}
 
 		//This is called right after a page load, with the data that edX has cached for us
 		//We need to use this to correctly reset the page, which includes:
-		//reselecting a user's previous answer and
-		//setting up the state dictionary
+			//resetting a user's previous answer and
+			//setting up the state dictionary
 		function setState(){
-			//browser compatibility
+			//browser compatibility crap
 			stateStr = arguments.length === 1 ? arguments[0] : arguments[1];
 			newState = JSON.parse(stateStr);
 
@@ -213,38 +169,36 @@
 			{
 				if(key in state)
 				{
-					//we expect the number of choices and correct answer to
+					//we expect the correct answer and tolerance to
 					//be set correctly by the xml that loaded the page
-					if(key != 'choices' && key != 'answer')
+					if(key != 'answer' && key != 'tol')
 						state[key] = newState[key];
 				}
 			}
 
 			//Here we repopulate the form, so users don't get super mad when their
 			//work is obliterated
-			repopulateForm();
+			repopulate_form();
 
 			//check to see if the user has the right answer
-			ckeckAnswers();
+			check_answers();
 
-			//send last answer, just in case
+			//resend last answer on page reload
 			if(state['attempts'] > 0)
 				edx_adapt.send_interaction(state['correct_answer'], state['attempts'], vars['user_id'], edx_adapt.get_problem_name());
 		}
 
 		function display_problem_callback(e)
 		{
-			if(e.detail.display == true) {
+			if (e.detail.display == true) {
 				//We're in the right place, display the problem
-				document.addEventListener("notify_page_load_error", pageload_error);
-				edx_adapt.notify_page_load(vars['user_id'], edx_adapt.get_problem_name());
 				displayed = true;
-				createForm("form");
-				//in case setState() has already been called, we need to repopulate the form with the user's last inputs
-				repopulateForm();
-				ckeckAnswers();
+				createForm('form');
+				//if we took too long and setState() has already been called, we need to repopulate the form with the user's last inputs
+				repopulate_form();
+				check_answers();
 			} else {
-				document.getElementById('form').innerHTML = "";
+				document.getElementById('form').innerHTML = ""
 			}
 		}
 
@@ -267,18 +221,21 @@
 
 	<div id="form">Loading content. Please wait...</div>
 
-	<div id="error"></div>
+	<div id="graph"></div>
 
 </div>
 
 	<script>
-		getVars();
+		//getVars();
+		vars = getUrlVars();
 		createAnswers();
+
+		document.addEventListener("notify_page_load_error", pageload_error);
+		window.edx_adapt.notify_page_load(vars['user_id'], edx_adapt.get_problem_name());
 
 		document.addEventListener("display_problem_request", display_problem_callback);
 		document.addEventListener("display_problem_request_error", display_problem_error_callback);
 		window.edx_adapt.display_problem_request(vars['user_id'], edx_adapt.get_problem_name());
-
 
 	</script>
 

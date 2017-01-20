@@ -1,0 +1,492 @@
+<html>
+
+<style>
+
+
+.bar rect {
+  fill: steelblue;
+  shape-rendering: crispEdges;
+}
+
+.bar text {
+  fill: #fff;
+}
+
+.axis path, .axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+#section {
+	float:right;
+	padding:10px;
+}
+#nav {
+	float:left;
+	padding:5px;
+}
+
+</style>
+
+<head>
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+	<script src="//edx-adapt-dev.raccoongang.com/static/js/server_interaction.js" type="text/javascript"></script>
+	<script src="//d3js.org/d3.v2.min.js?2.10.0"></script>
+	<script>
+		//This resize function doesn't actually work when we're inside a "jsinput" =(
+		function resizeIframe() {
+		  height = document.getElementById('all').offsetHeight + 10;
+		  window.parent.document.getElementById("answerform").height = height + 'px';
+		}
+
+		function getUrlVars() {
+		  var vars = {};
+		  var url = document.URL;
+		  url = url.split('%24').join('$');
+		  url = url.split('%3D').join('=');
+		  var parts = url.replace(/[?&$]+([^=$]+)=([^$]*)/gi, function(m,key,value) {
+			vars[key] = value;
+		  });
+		  return vars;
+		}
+
+		/*
+			This is a global state dictionary. We define this for convenience when working
+			with edX's state-saving paradigm. Any data that is required for operation to
+			seamlessly persist across page refreshes, or that EdX needs to know about, must
+			be placed in here.
+		*/
+		state = {
+			//are all of the student's inputs correct?
+				//required for grading the problem
+			'correct_answer' : false,
+			//list of correct inputs
+				//required for giving correct answers as hints
+			'answers' : [],
+			//list of user inputs
+				//required to repopulate the form so users don't shit bricks
+			'inputs' : [],
+			//attempts at the problem (how many times getGrade() has been called)
+				//required for our adaptive hints
+			'attempts' : 0,
+			//actual data
+				//required to detect new problems
+			'data' : [],
+			//some hint string to pass back
+			'hint' : '',
+			//bookkeeping about the range of each histogram bin
+			'from' : [],
+			'to' : []
+		};
+
+		displayed = false;
+
+		//url variables
+		vars = {}
+
+		//number of form entries
+		formsize = 0;
+
+		//just stupid rewrapping the url vars into a global variable
+		function getVars() {
+			vars = getUrlVars();
+		}
+
+		//Creates the form where users input data. Super simple
+		function createForm(divname) {
+			if(!displayed)
+				return;
+			var div = parent.document.getElementById(vars['div']);
+			var minval = parseInt(div.getAttribute('min'));
+			var maxval = parseInt(div.getAttribute('max'));
+			var bins = parseInt(div.getAttribute('bins'));
+			var help = false;
+			if(div.hasAttribute('help'))
+			{
+				help = true;
+			}
+
+			var stride = (maxval - minval + 1)/bins
+
+			formsize = bins;
+
+			var formstring = '<form><table>';
+
+			var row;
+
+			for(row = 0; row < bins; row++)
+			{
+				formstring += '<tr>';
+				var from = row * stride + minval;
+				var to = (row+1) * stride + minval - 1;
+
+				state['from'].push(from);
+				state['to'].push(to);
+
+				formstring += '<td>[' + from.toString() + ', ' + to.toString() + ']</td>';
+				formstring += '<td><input type="text" id="ans'+row.toString();
+				formstring += '" value="0" onkeypress= "setTimeout(check_answers, 250)"'
+				if( (row != 2 && row != 5) && help) //disable all but rows 2 and 5
+				{
+					formstring += ' style="color:blue" disabled';
+				}
+				formstring += '/></td>';
+				formstring += '</tr>';
+			}
+			formstring += '</table></form>';
+
+			var form = document.getElementById(divname);
+			form.innerHTML = formstring;
+
+			var c;
+			for(c = 0; c < bins; c++)
+			{
+				if(help && (c != 2 && c != 5))
+				{
+					//populate form and set user inputs to correct answers for some of the bins
+					elemId = 'ans' + c.toString();
+					document.getElementById(elemId).value = state['answers'][c];
+					state['inputs'][c] = state['answers'][c];
+				}
+			}
+		}
+
+		//checks to see if input == answers
+		//This runs whenever a user types a number into the form, and when getGrade() runs
+		function check_answers(){
+			var correct = true;
+			var c;
+			for(c = 0; c < formsize; c++)
+			{
+				var idstring = "ans"+c.toString();
+				var input = document.getElementById(idstring);
+				var ans = parseInt(input.value);
+				state['inputs'][c] = ans;
+				if(ans != state['answers'][c])
+				{
+					if(correct)
+						state['hint'] = 'Check your answer for the range';
+					correct = false;
+					state['hint'] += ' [' + state['from'][c].toString() + ', ' + state['to'][c].toString() + '],';
+				}
+			}
+			state['correct_answer'] = correct;
+
+			if(!correct)
+			{
+				var idx = state['hint'].lastIndexOf(',');
+				state['hint'] = state['hint'].substr(0,idx) + '.';
+				idx = state['hint'].lastIndexOf(',');
+				tempstr = state['hint'].substr(0,idx)
+				idx = tempstr.lastIndexOf(',');
+				if(idx != -1)
+					state['hint'] = state['hint'].substr(0,idx+1) + ' and' + state['hint'].substr(idx+1);
+			}
+
+			drawHistogram();
+		}
+
+		//Runs through the data and generates the correct values for each histogram bar
+		function createAnswers(){
+			var div = parent.document.getElementById(vars['div']);
+			data = JSON.parse(div.getAttribute('data'));
+			state['data'] = data;
+			var minval = parseInt(div.getAttribute('min'));
+			var maxval = parseInt(div.getAttribute('max'));
+			var bins = parseInt(div.getAttribute('bins'));
+			var help = false;
+			if(div.hasAttribute('help'))
+			{
+				help = true;
+			}
+			var stride = (maxval - minval + 1)/bins;
+
+			datalen = data.length;
+
+			var c;
+			for(c = 0; c < bins; c++)
+			{
+				state['answers'].push(0);
+				state['inputs'].push(0);
+				var i;
+				for(i = 0; i < datalen; i++)
+				{
+					if(data[i] >= minval + stride*c && data[i] < minval + stride*(c+1))
+					{
+						state['answers'][c] += 1;
+					}
+				}
+			}
+		}
+
+		//This executes when the user hits "Check"
+		//We need to at least return whether the answer is correct or not
+		//but for simplicity, we're gonna throw the whole state back
+		function getGrade(){
+			//first, make sure we have current knowledge of whether the answer is correct
+			check_answers();
+			//then add 1 to the attempt counter
+			state['attempts'] += 1;
+			//notify problem server of the student's attempt + grade
+			edx_adapt.send_interaction(state['correct_answer'], state['attempts'], vars['user_id'], edx_adapt.get_problem_name());
+
+			return JSON.stringify(state);
+		}
+
+		//pass back the whole state to edX
+		function getState(){
+			return JSON.stringify(state);
+		}
+
+		function repopulate_form(){
+			if(!displayed)
+				return;
+			var c;
+			var len = state['inputs'].length;
+			for(c = 0; c < len; c++)
+			{
+				var idstring = "ans"+c.toString();
+				var input = document.getElementById(idstring);
+				input.value = state['inputs'][c];
+			}
+		}
+
+		//This is called right after a page load, with the data that edX has cached for us
+		//We need to use this to correctly reset the page, which includes:
+			//refilling the input form,
+			//redrawing the histogram, and
+			//providing feedback for a correct answer
+		function setState(){
+			//browser compatibility crap
+			stateStr = arguments.length === 1 ? arguments[0] : arguments[1];
+			newState = JSON.parse(stateStr);
+
+			newProblem = false
+
+			//populate the state dictionary with all of the inputs except the data and correct answers
+				//(the problem may have changed, and these would be invalid, and we have already set
+				//them up anyway on the page load)
+			for(var key in newState)
+			{
+				if(key in state)
+				{
+					if(key != 'answers' && key != 'data')
+						state[key] = newState[key];
+				}
+			}
+
+			if( !arraysEqual(newState['data'], state['data']) )
+			{
+				//we need to check if this is a new problem or not
+				//if it is, we'll reset the attempts count to 0
+				//otherwise, whatever value edX has cached will get thrown in here
+				state['attempts'] = 0;
+			}
+
+			//Here we repopulate the form, so users don't get super mad when their
+			//work is obliterated
+			repopulate_form();
+
+			//make sure the dynamic histogram is redrawn with the user's inputs
+			drawHistogram();
+
+			//check to see if the user has the right answer
+			check_answers();
+
+			//resend last answer on page reload
+			if(state['attempts'] > 0)
+				edx_adapt.send_interaction(state['correct_answer'], state['attempts'], vars['user_id'], edx_adapt.get_problem_name());
+		}
+
+		function display_problem_callback(e)
+		{
+			if (e.detail.display == true) {
+				//We're in the right place, display the problem
+				displayed = true;
+				createForm("form");
+
+				repopulate_form();
+				check_answers();
+			} else {
+				document.getElementById('form').innerHTML = "";
+			}
+		}
+
+		function display_problem_error_callback(e)
+		{
+			document.getElementById('form').innerHTML = "Error connecting to RL server, panic wildly then notify somebody. " + e.detail.err + "</br>" +  e.detail.textStatus;
+		}
+
+		function pageload_error(e)
+		{
+			//probably remove in production
+			document.getElementById('error').innerHTML = "(server did not acknowledge page load)";
+		}
+
+		function arraysEqual(arr1, arr2) {
+			if(arr1.length !== arr2.length)
+				return false;
+			for(var i = arr1.length; i--;) {
+				if(arr1[i] !== arr2[i])
+					return false;
+			}
+
+			return true;
+		}
+
+		//Here is copy-pasta'd code that will need to get slapped somewhere
+		//don't worry about it
+		function drawHistogram()
+		{
+			if(!displayed)
+				return;
+			document.getElementById('graph').innerHTML = '';
+			var div = parent.document.getElementById(vars['div']);
+			var mind = parseInt(div.getAttribute('min'));
+			var maxd = parseInt(div.getAttribute('max'));
+			var numberOfBins = parseInt(div.getAttribute('bins'));
+			var tvalues = state['inputs'];
+			var yheight = parseInt(div.getAttribute('height'));
+			var year = parseInt(div.getAttribute('year'));
+			var title = 'Difference in Game Points: ' + year;
+			var xlabel = 'Score Difference';
+			if( div.hasAttribute('xlabel') )
+			{
+				xlabel = div.getAttribute('xlabel');
+			}
+			if( div.hasAttribute('title') )
+			{
+				title = div.getAttribute('title');
+			}
+
+
+			var formatCount = d3.format(",.0f");
+
+			var margin = {top: 30, right: 30, bottom: 40, left: 20},
+				width = 500 - margin.left - margin.right,
+				height = 250 - margin.top - margin.bottom;
+
+			var x = d3.scale.linear()
+				.domain([mind, maxd+1])
+				.range([0, width]);
+
+			var values = [];
+			for(var c = 0; c < numberOfBins; c++)
+			{
+				if(!(isNaN(tvalues[c])))
+				{
+					if(tvalues[c] > 0)
+					{
+						for(var i = 0; i < Math.min(tvalues[c],14); i++)
+						{
+							values.push(mind + 1 + ((maxd-mind)/numberOfBins)*c);
+						}
+					}
+				}
+			}
+
+			// Generate a histogram using twenty uniformly-spaced bins.
+			var data = d3.layout.histogram()
+				.bins(x.ticks(numberOfBins))
+				(values);
+
+			var y = d3.scale.linear()
+				.domain([0, yheight])
+				.range([height, 0]);
+
+			var xAxis = d3.svg.axis()
+				.scale(x)
+				.orient("bottom")
+
+			var yAxis = d3.svg.axis()
+				.scale(y)
+				.orient("left")
+
+			var svg = d3.select("#graph").append("svg")
+				.attr("width", width + margin.left + margin.right)
+				.attr("height", height + margin.top + margin.bottom)
+				.append("g")
+				.attr("transform", "translate(" + margin.left*2 + "," + margin.top + ")");
+
+			var bar = svg.selectAll(".bar")
+				.data(data)
+				.enter().append("g")
+				.attr("class", "bar")
+				.attr("transform", function(d) { return "translate(" + x(d.x) + "," + y(d.y) + ")"; });
+
+			bar.append("rect")
+				.attr("x", 1)
+				.attr("width", width/numberOfBins - 1)
+				.attr("height", function(d) { return height - y(d.y); });
+
+			svg.append("text")
+				.attr("x", (width / 2))
+				.attr("y", 0 - (margin.top / 2))
+				.attr("text-anchor", "middle")
+				.style("font-size", "16px")
+				.text(title);
+
+			svg.append("g")
+				.attr("class", "x axis")
+				.attr("transform", "translate(0," + height + ")")
+				.call(xAxis);
+
+			svg.append("text")
+				.attr("x", (width / 2))
+				.attr("y", height + margin.bottom - 5)
+				.attr("text-anchor", "middle")
+				.style("font-size", "14px")
+				.text(xlabel);
+
+			svg.append("g")
+				.attr("class", "y axis")
+				.attr("x", 0 - margin.left)
+				.call(yAxis);
+
+			svg.append("text")
+				.attr("transform", "rotate(-90)")
+				.attr("y", - 43)
+				.attr("x", 0 - (height / 2))
+				.attr("dy", "1em")
+				.style("text-anchor", "middle")
+				.style("font-size", "14px")
+				.text("Frequency");
+
+			resizeIframe();
+		}
+
+	</script>
+</head>
+<body>
+
+<div id="all">
+
+	<div id="nav">
+		<div id="form">Loading content. Please wait...</div>
+	</div>
+	<div id="section">
+		<div id="graph"></div>
+	</div>
+
+	<p>
+
+</div>
+
+	<script>
+		getVars();
+		createAnswers();
+
+		document.addEventListener("notify_page_load_error", pageload_error);
+		window.edx_adapt.notify_page_load(vars['user_id'], edx_adapt.get_problem_name());
+
+		document.addEventListener("display_problem_request", display_problem_callback);
+		document.addEventListener("display_problem_request_error", display_problem_error_callback);
+		window.edx_adapt.display_problem_request(vars['user_id'], edx_adapt.get_problem_name());
+
+	</script>
+
+
+</body>
+
+
+</html>
