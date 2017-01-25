@@ -204,13 +204,13 @@
 
 		function display_problem_error_callback(e)
 		{
-			document.getElementById('form').innerHTML = "Error connecting to RL server, panic wildly then notify somebody. " + e.detail.err + "</br>" +  e.detail.textStatus;
+			document.getElementById('form').innerHTML = "";
 		}
 
 		function pageload_error(e)
 		{
 			//probably remove in production
-			document.getElementById('error').innerHTML = "(server did not acknowledge page load)";
+			document.getElementById('error').innerHTML = "(Please be aware that Adapt propose for you problems in a specific order, the system will direct back to the problem specified in the order.)";
 		}
 
 	</script>

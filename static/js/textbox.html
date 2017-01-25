@@ -67,7 +67,7 @@
         function display_problem_error_callback(e)
         {
             var text_div = document.getElementById('text');
-            text_div.innerHTML = "Error connecting to EdxAdapt server.</br> Probably you are not enrolled in Adapt application, if it is your case visit Adapt enrolling page for that section, usually 'Introduction' or connect to the support team if automatic enrollment is not provided.</br> Details: " + e.detail.err + "</br>" + e.detail.textStatus;
+            text_div.innerHTML = "Error connecting to Adapt server.</br> Probably you are not enrolled in Adapt application, if it is your case visit Adapt enrolling page for that section, usually 'Introduction' or connect to the support team if automatic enrollment is not provided.</br> Details: " + e.detail.err + "</br>" + e.detail.textStatus;
             resizeIframe();
         }
 
@@ -90,7 +90,7 @@
                 }
                 if(e.detail.done_with_course)
                 {
-                    document.getElementById('completed').innerHTML = '<b>Thank you for finishing the study. Please close this window and return to TURK.</b>';
+                    document.getElementById('completed').innerHTML = '<b>Congratulations! You have finished the personalized practice activity for Producing Data: Sampling. Please select another section to work on using the vertical navigation menu on the left.</b>';
                 }
 
                 //TODO: pretest rejection
@@ -111,7 +111,7 @@
 <body>
 
     <div id="all">
-    <p id="text" style="font-family:verdana">Loading content. Please wait...</p>
+    <p id="text" style="font-family:verdana">The personalized practice activity is verifying that you are on the correct question. Please wait while the system is checking ...</p>
 
     <script>
         disableNavButtons();

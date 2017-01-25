@@ -92,7 +92,11 @@
 
         //Shuffle answerlist items in composed form for answers input: [srting1, string2, string3];
         //output: string3 + string1 + string2
-        function shuffleString(iterObject) {
+        function shuffleString(iterObject, shuffle) {
+            var shuffle = shuffle || false;
+            if (!shuffle) {
+                return iterObject.join('');
+            }
             var steps;
             var temp = iterObject.slice(0);
             var cacheString = '';
