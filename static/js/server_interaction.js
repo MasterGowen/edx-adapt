@@ -5,14 +5,19 @@
 (function( edx_adapt, $, undefined) {
 
     //Connection information
-    edx_adapt.apistr    = '/api/v1';
-    edx_adapt.server    = 'https://edx-adapt-dev.raccoongang.com';
+    edx_adapt.apistr = '/api/v1';
+    edx_adapt.server = 'https://edx-adapt-dev.raccoongang.com';
 
     edx_adapt.course_id = $(".xmodule_display", window.parent.document).attr('data-course-id');
 
     //Convert course_id taken from the Course page into a course string compatible with EdxAdapt. E.g:
     //course_id = course-v1:University+SS001+2017_N is transformed into University/SS001/2017_N
     edx_adapt.coursestr = edx_adapt.course_id.split(':')[1].replace('+', '/');
+
+    courserawurl = (window.location != window.parent.location) ? document.referrer : document.location.href;
+    partUrl = decodeURI(courserawurl).split(':');
+    urlList = partUrl[2].split('/');
+    edx_adapt.courseid = urlList[0] + ':' + urlList[2];
 
     //Notify problem server that a problem has been graded
     //on error, dispatches send_interaction_error event
@@ -22,7 +27,7 @@
 
         //Post student's attempt to the server log
         $.ajax({
-            url: "//" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user + '/interaction',
+            url: edx_adapt.server + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user + '/interaction',
             type: "POST",
             contentType: "application/json",
             data: JSON.stringify(data),
@@ -46,7 +51,7 @@
 
         data = {'problem': problem};
         $.ajax({
-            url: "//" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user + '/pageload',
+            url: edx_adapt.server + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user + '/pageload',
             type: "POST",
             contentType: "application/json",
             data: JSON.stringify(data),
@@ -134,7 +139,7 @@
 
         //check server for user status
         $.ajax({
-            url: "//" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user,
+            url: edx_adapt.server + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user,
             type: "GET",
             success: function (data) {
 
@@ -149,8 +154,8 @@
                     if (data['okay'] == false) {
 
                         if (data['next'] == null) {
-                            //The server just hasn't set the next problem yet. Retry twice, wait between attempts for 1s.
-                            if (retry < 2) {
+                            //The server just hasn't set the next problem yet. Retry once, wait between attempts for 1s.
+                            if (retry < 1) {
                                 setTimeout(function () {
                                     edx_adapt.is_complete(user, problem, retry + 1);
                                 }, 1000);
@@ -223,7 +228,7 @@
         }
 
         $.ajax({
-            url: "//" + edx_adapt.server + ":" + edx_adapt.apiport + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user,
+            url: edx_adapt.server + edx_adapt.apistr + '/course/' + edx_adapt.courseid + '/user/' + user,
             type: "GET",
             success: function (data) {
                 //data = JSON.parse(data)

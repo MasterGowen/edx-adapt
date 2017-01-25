@@ -28,8 +28,8 @@
 		function getUrlVars() {
 		  var vars = {};
 		  var url = document.URL;
-		  url = url.replace('%24', '&');
-		  url = url.replace('%3D', '=');
+		  url = url.replace(/%24/g, '&');
+		  url = url.replace(/%3D/g, '=');
 
 		  var parts = url.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
 			vars[key] = value;
