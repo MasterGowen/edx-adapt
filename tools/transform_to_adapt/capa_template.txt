@@ -1,0 +1,22 @@
+import json
+
+feedback = {{
+{feedback}
+}}
+
+# Answer checking function called when the user hits "Check"
+def vglcfn(e, ans):
+    # Here we load the dictionary that EdX creates from the return values of GetState() and GetGrade()
+    par = json.loads(ans);
+    # Then we pull out and parse the return value from GetGrade(). The value from GetState() is in par["state"]
+    answer = json.loads(par["answer"])
+    # In our case the boolean value named correct_answer is true if the student got the question right
+    return {{
+        'input_list': [
+            {{ 'ok': answer['correct_answer'], 'msg': feedback[{feedback_key}}},
+        ]
+    }}
+
+    text_question = (
+{question}
+    )
