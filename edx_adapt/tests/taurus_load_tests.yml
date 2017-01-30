@@ -1,67 +1,124 @@
+---
 # Taurus load testing config file
 # How to use it:
 # 0. Make sure you have java installed
 # 1. pip install bzt <- install it
 # 2. bzt taurus_load_tests.yml <- run it
-
----
 execution:
-- scenario: login-and-open-problem
+- scenario: main_test_scenario
   concurrency: 100
-  iterations: 3
+  iterations: 300
   ramp-up: 2m
-  hold-for: 7m
-
+  hold-for: 4m
 
 scenarios:
-  login-and-open-problem:
-    # This scenario simulates following steps:
-    # 1. User logs into edx
-    # 2. User goes to problem page
-    think-time: 50ms
-    retrieve-resources: false
-    store-cookie: true
+  login-and-open-intro-page:
+    default-address: https://edx-stanford-dev.raccoongang.com
     requests:
     # login to open edx
-      - url: http://52.50.241.19/login
+      - url: /login
         extract-regexp:
           csrf_token:
             regexp: csrftoken=(\w*);
             subject: headers
-      - url: http://52.50.241.19/user_api/v1/account/login_session/
+      - url: /user_api/v1/account/login_session/
         method: POST
         headers:
           X-CSRFToken: ${csrf_token}
         body:
-          email: student21@raccoongang.com
-          password: p21
-    # navigate to problem page
-      - http://52.50.241.19/courses/course-v1:CMU+STAT101+2014_T1/info
-      - http://52.50.241.19/courses/course-v1:CMU+STAT101+2014_T1/courseware/statistics/
-    # load problem page and fetch all additional resources
-      - http://52.50.241.19/courses/course-v1:CMU+STAT101+2014_T1/courseware/statistics/T3/
-      - url: http://52.50.241.19/courses/course-v1:CMU+STAT101+2014_T1/xblock/block-v1:CMU+STAT101+2014_T1+type@problem+block@T3:t3/handler/xmodule_handler/problem_get
-        method: POST
-        headers:
-          X-CSRFToken: ${csrf_token}
-      - url: http://52.50.241.19/dashboard
-      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
-      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
-      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
-      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
-      - url: http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21/pageload
+          email: ${email}
+          password: ${password}
+    # navigate to problem xblock
+      - /courses/course-v1:Raccoon+RG001+2017/info
+      - /courses/course-v1:Raccoon+RG001+2017/courseware/pd_sampling_training/
+    # Visit unit with EdxAdaptXBlock used for students enrollment.
+    # Actual enrollment is separated into xblock-enrolling scenario
+      - /courses/course-v1:Raccoon+RG001+2017/courseware/pd_sampling_training/adaptive_practice/
+
+  xblock-enrolling:
+      # This scenario simulates enrolling student in Adapt with XBlock
+    default-address: https://edx-adapt-dev.raccoongang.com
+    requests:
+      # Check student enrolled
+      - url: /api/v1/course/Raccoon+RG001+2017:pd_sampling_training/user/${anonym_id}
+        extract-regexp:
+          status_code:
+            regexp: (.+)
+            subject: http-code
+      - if: '"${status_code}" == "404"'
+        then:
+          # Configure skills
+          - url: /api/v1/parameters/bulk
+            method: POST
+            headers:
+              Content-Type: application/json
+            body:
+              course_id: "Adapt+A001+2017:7fc07e783e3645508eb6e996300a5e63"
+              params: {"threshold": 0.99, "ps": 0.25, "pi": 0.1, "pg": 0.25, "pt": 0.5}
+              user_id: "${anonym_id}"
+              skills_list: ["None"]
+          # Register user
+          - url: /api/v1/course/Raccoon+RG001+2017:pd_sampling_training/user
+            method: POST
+            headers:
+              Content-Type: application/json
+            body:
+              user_id: "${anonym_id}"
+  work-with-problem:
+    default-address: https://edx-adapt-dev.raccoongang.com
+    requests:
+      - /api/v1/course/Raccoon+RG001+2017:pd_sampling_training/user/${anonym_id}
+      - /api/v1/course/Raccoon+RG001+2017:pd_sampling_training/user/${anonym_id}
+      - /api/v1/course/Raccoon+RG001+2017:pd_sampling_training/user/${anonym_id}
+      - /api/v1/course/Raccoon+RG001+2017:pd_sampling_training/user/${anonym_id}
+      - url: /api/v1/course/Raccoon+RG001+2017:pd_sampling_training/user/${anonym_id}/pageload
         method: OPTIONS
-      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
-      - url: http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21/pageload
+      - /api/v1/course/Raccoon+RG001+2017:pd_sampling_training/user/${anonym_id}
+      - url: /api/v1/course/Raccoon+RG001+2017:pd_sampling_training/user/${anonym_id}/pageload
         method: POST
         headers:
           Content-Type: application/json
-        body: '{"problem": "T3"}'  # post JSON
-      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
-      - http://52.210.53.36:8080/api/v1/course/CMUSTAT101/user/student21
+        body:
+          problem: "Post_test_0"
+      - /api/v1/course/Raccoon+RG001+2017:pd_sampling_training/user/${anonym_id}
+      - /api/v1/course/Raccoon+RG001+2017:pd_sampling_training/user/${anonym_id}
 
+  main-test-scenario:
+    data-sources:
+      - path: ../../data/taurus_test_users.csv
+        loop: true
+    think-time: 50ms
+    retrieve-resources: true
+    store-cookie: true
+    timeout: 10s
+    requests:
+      - include-scenario: login-and-open-intro-page
+      - include-scenario: xblock-enrolling
+      - include-scenario: work_with_problem
 
 reporting:
-- module: final_stats
-  dump-csv: taurus_load_tests_report.csv
-- module: console
+  - module: final_stats
+    dump-csv: taurus_adapt_load_tests_report_100-local.csv
+  - module: console
+  - module: blazemeter
+    report-name: Local 100 course RG
+    test: only Adapt Load Test
+    project: 158825
+
+modules:
+  jmeter:
+    path: ~/edx-adapt/apache-jmeter-3.1
+
+  cloud:
+    test: Edx Adapt Load Test
+    project: 158825
+    token:  # Token to BlazeMeter account
+    timeout: 10s  # BlazeMeter API client timeout
+    browser-open: start
+    check-interval: 5s
+
+  # Free BlazeMeter allow to store tests results for registered BlazeMeter account event if it is free.
+  # Results stored for free registered user are stayed available much longer than results created for anonymous user.
+  # To see tests results on the BlazeMeter DashBoard provide API Key from BlazeMeter account settings.
+  blazemeter:
+    token:  # Token to BlazeMeter account
