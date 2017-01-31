@@ -1,18 +1,42 @@
+import csv
 import json
+import os
 import random
-import re
 import string
 import unittest
 
 import pymongo
 
-import course_setup_test
 from edx_adapt.api import adapt_api
-from tools import course_setup
 
 COURSE_ID = 'CMUSTAT'
 
 base_api_path = '/api/v1/course'
+
+
+def _setup_course_in_edxadapt(client, **kwargs):
+    client.post(base_api_path, data=json.dumps({'course_id': kwargs['course_id']}), headers=kwargs['headers'])
+    for skill in kwargs['skills']:
+        payload = json.dumps({'skill_name': skill})
+        client.post(base_api_path + '/{course_id}/skill'.format(**kwargs), data=payload, headers=kwargs['headers'])
+    path_to_file = os.path.join(os.path.dirname(__file__), '../../data/BKT/problems.csv')
+    with open(path_to_file) as file_csv:
+        for row in csv.reader(file_csv):
+            problem = row[0]
+            skill = row[1]
+            url = 'http://edx-lms.raccoongang.com/courses/{course_id}/{pname}'.format(pname=problem, **kwargs)
+            pre = "Pre_a" in problem
+            post = "Post_a" in problem
+            payload = json.dumps({
+                'problem_name': problem, 'tutor_url': url, 'skills': [skill], 'pretest': pre, 'posttest': post
+            })
+            client.post(
+                base_api_path + '/{course_id}'.format(**kwargs), data=payload, headers=kwargs['headers']
+            )
+    payload = json.dumps({'experiment_name': 'test_experiment2', 'start_time': 1462736963, 'end_time': 1999999999})
+    client.post(
+        base_api_path + '/{course_id}/experiment'.format(**kwargs), data=payload, headers=kwargs['headers']
+    )
 
 
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
@@ -24,18 +48,22 @@ class BaseTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.skills = ['center', 'shape', 'spread', 'x axis', 'y axis', 'h to d', 'd to h', 'histogram', 'None']
         cls.course_id = COURSE_ID + id_generator(3)
-        course_setup.setup_course_in_edxadapt(cls.course_id)
-
         cls.headers = {'Content-type': 'application/json'}
         cls.app = adapt_api.app.test_client()
+        cls.params = {
+            'headers': cls.headers,
+            'skills': cls.skills,
+            'course_id': cls.course_id,
+        }
+        _setup_course_in_edxadapt(cls.app, **cls.params)
+
 
     @classmethod
     def tearDownClass(cls):
         # NOTE(idegtiarov) sqlite is too slow for using on server we will support only MongoDB
-        mclient = pymongo.MongoClient()['edx-adapt']
-        mclient.drop_collection(cls.course_id)
-        regex = re.compile('_student_')
-        mclient.Generic.remove({'key': {'$regex': regex}})
+        mclient = pymongo.MongoClient()
+        # TODO(idegtiarov) improve application start-up to use another database name for tests
+        mclient.drop_database('edx-adapt')
 
     def _answer_pre_assessment_problems(self, correct_answers=0, attention_question=True):
         """
@@ -94,8 +122,7 @@ class CourseTestCase(BaseTestCase):
 
     def test_course_has_skills(self):
         skills = json.loads(self.app.get(base_api_path + '/{}/skill'.format(self.course_id)).data)
-        expected_skills = [u'x axis', u'histogram', u'h to d', u'shape', u'spread', u'y axis', u'd to h', u'center',
-                           u'None']
+        expected_skills = ['center', 'shape', 'spread', 'x axis', 'y axis', 'h to d', 'd to h', 'histogram', 'None']
         self.assertEqual(expected_skills, skills['skills'])
 
     def test_course_problem_fulfilled(self):
@@ -147,16 +174,8 @@ class PreAssessmentTestCase(BaseTestCase):
         """
         Test student got status "done_with_course" after answering correctly on all pre-assessment problems.
         """
-        self._answer_pre_assessment_problems(correct_answers=7, attention_question=False)
+        self._answer_pre_assessment_problems(correct_answers=8, attention_question=False)
 
-        status = json.loads(self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data)
-        self.assertEqual(True, status['done_with_course'])
-
-    def test_student_cut_off_after_all_incorrect_answers(self):
-        """
-        Test student got status "done_with_course" after answering incorrectly on all pre-assessment problems.
-        """
-        self._answer_pre_assessment_problems(correct_answers=0)
         status = json.loads(self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data)
         self.assertEqual(True, status['done_with_course'])
 
@@ -273,7 +292,7 @@ class MainLogicTestCase(BaseTestCase):
         )
         self.assertTrue(status['done_with_current'])
 
-        self._answer_problem(repeat=17)
+        self._answer_problem(repeat=18)
         status = json.loads(
             self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
         )

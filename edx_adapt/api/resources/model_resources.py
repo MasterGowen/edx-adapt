@@ -39,7 +39,7 @@ class Parameters(Resource):
         skill = args['skill_name']
         params = args['params']
 
-        prob_list = self.repo.get_probabilities(course)
+        prob_list = self.repo.get_model_params(course)
         if prob_list:
             params = random.choice(prob_list)
         try:
@@ -49,12 +49,18 @@ class Parameters(Resource):
 
         return {'success': True}, 200
 
-param_parser = reqparse.RequestParser()
-param_parser.add_argument('course_id', type=str, location='json', help="Optionally supply a course id")
-param_parser.add_argument('user_id', type=str, location='json', help="Optionally supply a user ID")
-param_parser.add_argument('skills_list', type=list, location='json', help="Optionally supply the list with skill names")
-param_parser.add_argument('params', type=dict, location='json', required=True,
-                          help="Please supply the desired model parameters as a dictionary")
+param_bulk_parser = reqparse.RequestParser()
+param_bulk_parser.add_argument('course_id', type=str, location='json', help="Optionally supply a course id")
+param_bulk_parser.add_argument('user_id', type=str, location='json', help="Optionally supply a user ID")
+param_bulk_parser.add_argument(
+    'skills_list', type=list, location='json', help="Optionally supply the list with skill names"
+)
+param_bulk_parser.add_argument(
+    'params',
+    type=dict,
+    location='json',
+    required=True,
+    help="Please supply the desired model parameters as a dictionary")
 
 
 class ParametersBulk(Resource):
@@ -77,7 +83,7 @@ class ParametersBulk(Resource):
         skills_list = args['skills_list']
         params = args['params']
 
-        prob_list = self.repo.get_probabilities(course)
+        prob_list = self.repo.get_model_params(course)
         if prob_list:
             params = random.choice(prob_list)
         try:

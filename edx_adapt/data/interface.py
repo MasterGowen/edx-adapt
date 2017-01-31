@@ -57,10 +57,10 @@ class DataInterface(object):
     def enroll_user(self, course_id, user_id):
         raise NotImplementedError( "Data module must implement this" )
 
-    def post_probabilities(self, course_id, probabilities):
+    def post_model_params(self, course_id, prob_list, new=False):
         raise NotImplementedError("Data module must implement this")
 
-    def get_probabilities(self, course_id):
+    def get_model_params(self, course_id):
         raise NotImplementedError("Data module must implement this")
 
     """ Retrieve course information """

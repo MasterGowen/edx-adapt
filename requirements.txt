@@ -1,11 +1,8 @@
 boto
-cma
 flask
 flask-cors
 flask_restful
 hmmlearn
-requests
 pymongo
 sklearn
-sqlitedict
-tinydb
+requests

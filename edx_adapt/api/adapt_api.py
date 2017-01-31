@@ -10,7 +10,7 @@ import edx_adapt.api.resources.model_resources as MR
 import edx_adapt.api.resources.etc_resources as ER
 # import data and model stuff
 import edx_adapt.data.course_repository as repo
-import edx_adapt.data.mongodb_new_storage as mongodbstore
+import edx_adapt.data.mongodb_storage as mongodbstore
 import edx_adapt.select.skill_separate_random_selector as select
 import edx_adapt.model.bkt as bkt
 
