@@ -125,7 +125,7 @@
         }
         if (parent.document.getElementById('problem_' + problemname) == null) {
                 console.log('On a Wrong Page');
-                return 'None';
+                return $('[data-problem-id]').data('problem-id').split('@').pop();
         }
         return problemname;
     };
@@ -235,6 +235,13 @@
                 var cur = data['current'];
                 var next = data['next'];
                 var redirect = '';
+
+                // FIXME(idegtiarov) Permission for fluent navigation change, should be removed after experiment or improved
+                if (data['perm']) {
+                    var event = new CustomEvent("display_problem_request", {detail: { display: true}});
+                    document.dispatchEvent(event);
+                    return;
+                }
 
                 if (data['done_with_current']) {
                     //we can load current or next

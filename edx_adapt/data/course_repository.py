@@ -1,6 +1,7 @@
 """Repository that implements DataInterface using a tinydb backend """
 
 from datetime import datetime
+import random
 
 import interface
 from edx_adapt import logger
@@ -94,7 +95,11 @@ class CourseRepositoryMongo(interface.DataInterface):
     def enroll_user(self, course_id, user_id):
         coll = course_id + COLL_SUFFIX['user_problem']
         self.store.course_append(course_id, 'users_in_progress', user_id)
-        self.store.record_data(coll, {'student_id': user_id, 'current': None, 'next': None})
+        # FIXME(idegtiarov) For first experiment with adaptive section we will add possibility for random part of
+        # student to choose any problem they like from training part (before post assessment) should be removed after
+        # experiment or improved
+        perm = random.random() < 0.25  # fluent navigation will be allowed for 1/4 part of students
+        self.store.record_data(coll, {'student_id': user_id, 'current': None, 'next': None, 'perm': perm})
 
     def post_model_params(self, course_id, prob_list, new=False):
         """
@@ -368,3 +373,28 @@ class CourseRepositoryMongo(interface.DataInterface):
             add_filter={'problem.skills': skill_name, 'type': 'response', 'attempt': 1},
             get_from_doc='correct'
         )
+
+    # FIXME(idegtiarov) Permission for fluent navigation change, should be removed after experiment or improved
+    def get_permission(self, course_id, user_id):
+        coll = course_id + COLL_SUFFIX['user_problem']
+        return self.store.get_one(coll, user_id, 'perm')
+
+    def set_permission(self, course_id, user_id, permission=False):
+        coll = course_id + COLL_SUFFIX['user_problem']
+        self.store.update_doc(coll, {'student_id': user_id}, {'$set': {'perm': permission}})
+
+    # FIXME(idegtiarov) Permission for fluent navigation change, should be removed after experiment or improved
+    def set_current_problem(self, course_id, user_id, problem_name):
+        coll = course_id + COLL_SUFFIX['user_problem']
+        problems = self.store.course_search(
+            course_id, 'problems', {'problem_name': problem_name}, 'problems', {'problem_name': problem_name}
+        ).get('problems')
+        if problems:
+            problem_dict = problems[0]
+            update_dict = {'$set': {'current': problem_dict}}
+            self.store.update_doc(coll, {'student_id': user_id}, update_dict)
+        else:
+            logger.info("There is no problem with name the {} registered in the course {}".format(
+                problem_name, course_id)
+            )
+

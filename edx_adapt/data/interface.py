@@ -173,6 +173,13 @@ class DataInterface(object):
     def get(self, key):
         raise NotImplementedError( "Data module must implement this" )
 
+    # FIXME(idegtiarov) Permission for fluent navigation change, should be removed after experiment or improved
+    def get_permission(self, course_id, user_id):
+        raise NotImplementedError("Data module must implement this")
+
+    def set_permission(self, course_id, user_id):
+        raise NotImplementedError("Data module must implement this")
+
 
 class DataException(Exception):
     pass

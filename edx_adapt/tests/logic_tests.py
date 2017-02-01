@@ -57,6 +57,8 @@ class BaseTestCase(unittest.TestCase):
         }
         _setup_course_in_edxadapt(cls.app, **cls.params)
 
+        cls.cli = pymongo.MongoClient()['edx-adapt']
+
 
     @classmethod
     def tearDownClass(cls):
@@ -299,3 +301,70 @@ class MainLogicTestCase(BaseTestCase):
         # NOTE(idegtiarov) with default parameter's set student has to answer correctly not more than on 28 problems
         # from 56 before he will be shifted to Post_assessment part
         self.assertTrue(status['next']['posttest'])
+
+
+class FluentNavigationTestCase(BaseTestCase):
+    def setUp(self):
+        self.student_name = 'fluent_nav_test' + id_generator()
+
+        self.app.post(
+            base_api_path + '/{}/user'.format(self.course_id),
+            data=json.dumps({'user_id': self.student_name}),
+            headers=self.headers
+        )
+
+        self.cli['{}_problems'.format(self.course_id)].update_one(
+            {'student_id': self.student_name}, {'$set': {'perm': True}}
+        )
+
+        self.student_status = json.loads(
+            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
+
+    def test_student_permissions(self):
+        current_status = json.loads(
+            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
+        self.assertTrue(current_status['perm'], msg="User have no permission for free navigation!")
+
+    def test_change_current_on_page_load(self):
+        current_status = json.loads(
+            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
+        self.assertEqual(current_status['current'], self.student_status['current'])
+        problems = self.cli.Courses.find_one({'course_id': self.course_id})['problems']
+        while True:
+            problem = random.choice(problems)
+            if problem['problem_name'].startswith('Post_a'):
+                continue
+            break
+        self.app.post(
+            base_api_path + '/{}/user/{}/pageload'.format(self.course_id, self.student_name),
+            data=json.dumps({'problem': problem['problem_name']}),
+            headers=self.headers
+        )
+
+        new_status = json.loads(
+            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
+
+        self.assertEqual(new_status['current'], problem, msg='Current problem was not changed during pageload request')
+
+    def test_opening_post_assessment_problem(self):
+        problems = self.cli.Courses.find_one({'course_id': self.course_id})['problems']
+        for pro in problems:
+            if pro['problem_name'].startswith('Post_assessment'):
+                problem = pro
+                break
+        self.app.post(
+            base_api_path + '/{}/user/{}/pageload'.format(self.course_id, self.student_name),
+            data=json.dumps({'problem': problem['problem_name']}),
+            headers=self.headers
+        )
+
+        new_status = json.loads(
+            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
+        print(new_status['current']['problem_name'])
+        self.assertTrue(new_status['current']['problem_name'].startswith('Post_assessment'))
+        self.assertFalse(new_status['perm'])
