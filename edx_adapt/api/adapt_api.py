@@ -11,6 +11,7 @@ import edx_adapt.api.resources.etc_resources as ER
 # import data and model stuff
 import edx_adapt.data.course_repository as repo
 import edx_adapt.data.mongodb_storage as mongodbstore
+from edx_adapt import logger
 import edx_adapt.select.skill_separate_random_selector as select
 import edx_adapt.model.bkt as bkt
 
@@ -104,7 +105,7 @@ def page_not_found(e):
 
 @app.before_request
 def log_request_info():
-    app.logger.debug('Body: %s', flask.request.get_data())
+    logger.debug('Body: %s', flask.request.get_data())
 
 
 def run():
