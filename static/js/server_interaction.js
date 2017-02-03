@@ -125,7 +125,7 @@
         }
         if (parent.document.getElementById('problem_' + problemname) == null) {
                 console.log('On a Wrong Page');
-                return $('[data-problem-id]').data('problem-id').split('@').pop();
+                return $('[data-problem-id]', window.parent.document).data('problem-id').split('@').pop();
         }
         return problemname;
     };

@@ -351,6 +351,9 @@ class FluentNavigationTestCase(BaseTestCase):
         self.assertEqual(new_status['current'], problem, msg='Current problem was not changed during pageload request')
 
     def test_opening_post_assessment_problem(self):
+        current_status = json.loads(
+            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
         problems = self.cli.Courses.find_one({'course_id': self.course_id})['problems']
         for pro in problems:
             if pro['problem_name'].startswith('Post_assessment'):
@@ -365,6 +368,29 @@ class FluentNavigationTestCase(BaseTestCase):
         new_status = json.loads(
             self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
         )
-        print(new_status['current']['problem_name'])
+        self.assertNotEqual(new_status['current'], current_status['current'])
         self.assertTrue(new_status['current']['problem_name'].startswith('Post_assessment'))
         self.assertFalse(new_status['perm'])
+
+    def test_current_not_change_without_permission(self):
+        self.cli['{}_problems'.format(self.course_id)].update_one(
+            {'student_id': self.student_name}, {'$set': {'perm': False}}
+        )
+        current_status = json.loads(
+            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
+        problems = self.cli.Courses.find_one({'course_id': self.course_id})['problems']
+        while True:
+            problem = random.choice(problems)
+            if problem == current_status['current']:
+                continue
+            break
+        self.app.post(
+            base_api_path + '/{}/user/{}/pageload'.format(self.course_id, self.student_name),
+            data=json.dumps({'problem': problem['problem_name']}),
+            headers=self.headers
+        )
+        new_status = json.loads(
+            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )
+        self.assertEqual(new_status['current'], current_status['current'])

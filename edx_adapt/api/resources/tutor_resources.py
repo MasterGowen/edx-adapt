@@ -232,15 +232,16 @@ class UserPageLoad(Resource):
             args['unix_seconds'] = int(time.time())
 
         # FIXME(idegtiarov) Permission for fluent navigation change, should be removed after experiment or improved
-        try:
-            cur = self.repo.get_current_problem(course_id, user_id)
-            if not cur or args['problem'] != cur.get('problem_name'):
-                self.repo.set_current_problem(course_id, user_id, args['problem'])
-            if args['problem'].startswith('Post_assessment'):
-                self.repo.set_permission(course_id, user_id)
-        except DataException as e:
-            logger.exception("DATA EXCEPTION:")
-            abort(500, message=e.message)
+        if self.repo.get_permission(course_id, user_id):
+            try:
+                cur = self.repo.get_current_problem(course_id, user_id)
+                if not cur or args['problem'] != cur.get('problem_name'):
+                    self.repo.set_current_problem(course_id, user_id, args['problem'])
+                if args['problem'].startswith('Post_assessment'):
+                    self.repo.set_permission(course_id, user_id)
+            except DataException as e:
+                logger.exception("DATA EXCEPTION:")
+                abort(500, message=e.message)
 
         try:
             self.repo.post_load(course_id, args['problem'], user_id, args['unix_seconds'])
