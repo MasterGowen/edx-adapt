@@ -33,7 +33,9 @@ class UserProblems(Resource):
         try:
             nex = self.repo.get_next_problem(course_id, user_id)
             cur = self.repo.get_current_problem(course_id, user_id)
+            # FIXME(idegtiarov) Permission for fluent navigation change, should be removed after experiment or improved
             perm = self.repo.get_permission(course_id, user_id)
+            post_link = self.repo.get_all_remaining_posttest_problems(course_id, user_id)[0]['tutor_url']
         except DataException as e:
             abort(404, message=e.message)
 
@@ -98,7 +100,9 @@ class UserProblems(Resource):
             "done_with_current": done_with_current,
             "okay": okay,
             "done_with_course": done_with_course,
-            'perm': perm
+            # FIXME(idegtiarov) Permission for fluent navigation change, should be removed after experiment or improved
+            'perm': perm,
+            'exam': post_link,
         }
 
 

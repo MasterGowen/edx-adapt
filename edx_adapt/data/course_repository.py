@@ -99,7 +99,8 @@ class CourseRepositoryMongo(interface.DataInterface):
         # student to choose any problem they like from training part (before post assessment) should be removed after
         # experiment or improved
         perm = random.random() < 0.25  # fluent navigation will be allowed for 1/4 part of students
-        self.store.record_data(coll, {'student_id': user_id, 'current': None, 'next': None, 'perm': perm})
+        nav = 'free' if perm else 'adapt'
+        self.store.record_data(coll, {'student_id': user_id, 'current': None, 'next': None, 'perm': perm, 'nav': nav})
 
     def post_model_params(self, course_id, prob_list, new=False):
         """

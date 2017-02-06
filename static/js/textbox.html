@@ -55,6 +55,14 @@
         {
             var text_div = document.getElementById('text');
             if(e.detail.display == true) {
+
+                //FIXME(idegtiarov) Permission for fluent navigation change, should be removed after experiment or improved
+                if (e.detail.exam && !e.detail.probName.startsWith('Post_assessment') ) {
+                    document.getElementById('examButton').innerHTML = '<button height="50" style="border-radius: 5px; background-color: #f1f1f1" onclick="window.top.location.replace(\''+ e.detail.exam +'\')"><font
+size="2">When you are ready to test your knowledge for this section, click here!</font></button>';
+                }
+
+
                 //We're in the right place, display the problem
                 text_div.innerHTML = window.parent.document.getElementById(vars['div']).getAttribute('text');
             } else {
@@ -111,6 +119,7 @@
 <body>
 
     <div id="all">
+	<p id="examButton" style="color: brown;"></p>
     <p id="text" style="font-family:verdana">The personalized practice activity is verifying that you are on the correct question. Please wait while the system is checking ...</p>
 
     <script>

@@ -237,8 +237,9 @@
                 var redirect = '';
 
                 // FIXME(idegtiarov) Permission for fluent navigation change, should be removed after experiment or improved
+                var examLink = data['exam'];
                 if (data['perm']) {
-                    var event = new CustomEvent("display_problem_request", {detail: { display: true}});
+                    var event = new CustomEvent("display_problem_request", {detail: { display: true, exam: examLink, probName: edx_adapt.get_problem_name()}});
                     document.dispatchEvent(event);
                     return;
                 }
