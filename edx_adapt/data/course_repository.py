@@ -33,9 +33,9 @@ class CourseRepositoryMongo(interface.DataInterface):
         self.store.create_table(
             coll_log, index_fields=[
                 ['student_id', 'ascending'],
-                ['timestamp', 'descending'],
                 ['problem.problem_name', 'ascending'],
-                ['attempt', 'ascending']
+                ['attempt', 'ascending'],
+                ['correct', 'ascending'],
             ],
             index_unique=True)
         self.store.create_table(coll_user_problem, index_fields=[['student_id', 'ascending']], index_unique=True)
