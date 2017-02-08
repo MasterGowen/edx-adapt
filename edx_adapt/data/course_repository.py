@@ -392,7 +392,7 @@ class CourseRepositoryMongo(interface.DataInterface):
         ).get('problems')
         if problems:
             problem_dict = problems[0]
-            update_dict = {'$set': {'current': problem_dict}}
+            update_dict = {'$set': {'current': problem_dict, 'next': None}}
             self.store.update_doc(coll, {'student_id': user_id}, update_dict)
         else:
             logger.info("There is no problem with name the {} registered in the course {}".format(
