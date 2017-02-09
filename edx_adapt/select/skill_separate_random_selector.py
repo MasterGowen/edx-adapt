@@ -119,16 +119,9 @@ class SkillSeparateRandomSelector(SelectInterface):
 
                 post = self.data_interface.get_all_remaining_posttest_problems(course_id, user_id)
                 if len(post) > 0:
-                    for id in range(14):
-                        prob = 'Post_assessment_'+str(id)
-                        for post_prob in post:
-                            if post_prob['problem_name'] == prob:
-                                return post_prob
-                    logger.warning("Something goes wrong while choosing Post test problem")
-
-                if len(post) == 0:
+                    return random.choice(post)
+                else:
                     return {'congratulations': True, 'done': True}
-                return post[0]
 
             candidate_problem_list = [] # List of problems to choose from
             for skill_name in self.data_interface.get_skills(course_id): # For each skill
@@ -153,7 +146,7 @@ class SkillSeparateRandomSelector(SelectInterface):
             if candidate_problem_list:  # If candidate list is not empty, randomly choose one from it
                 return random.choice(candidate_problem_list)
             else:  # If candidate list is empty, return post-test
-                return self.data_interface.get_all_remaining_posttest_problems(course_id, user_id)[0]
+                return random.choice(self.data_interface.get_all_remaining_posttest_problems(course_id, user_id))
 
         except DataException as e:
             raise SelectException("DataException: " + e.message)
