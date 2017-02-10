@@ -105,7 +105,9 @@ def page_not_found(e):
 
 @app.before_request
 def log_request_info():
-    logger.debug('Body: %s', flask.request.get_data())
+    logger.debug('{request}\n{headers}{body}\n'.format(
+        request=str(flask.request), headers=flask.request.headers, body=flask.request.get_data()
+    ))
 
 
 def run():
