@@ -5,6 +5,7 @@ import random
 from flask_restful import Resource, abort, reqparse
 
 from edx_adapt.data.interface import DataException
+from edx_adapt import logger
 from edx_adapt.select.interface import SelectException
 
 param_parser = reqparse.RequestParser()
@@ -80,15 +81,29 @@ class ParametersBulk(Resource):
         args = param_parser.parse_args()
         course = args['course_id']
         user = args['user_id']
-        skills_list = args['skills_list']
-        params = args['params']
+        try:
+            skills_list = self.repo.get_skills(course)
 
-        prob_list = self.repo.get_model_params(course)
-        if prob_list:
-            params = random.choice(prob_list)
+            prob_list = self.repo.get_model_params(course)
+        except DataException:
+            logger.exception(
+                "Skills field are not found in the course: {}, student's skills cannot be added".format(course)
+            )
+            abort(
+                500,
+                "Course doesn't contain skills, please update the course {} and try adding student again.".format(
+                    course
+                )
+            )
+        logger.info(
+            "Skills for the student {} are taken directly from the course {} in which student is enrolled".format(
+                user, course
+            )
+        )
+        params = random.choice(prob_list) if prob_list else args['params']
         try:
             for skill in skills_list:
                 self.selector.set_parameter(params, course, user, skill)
         except SelectException as e:
             abort(500, message=str(e))
-        return {'success': True}, 201
+        return {'success': True, 'configuredSkills': skills_list}, 201

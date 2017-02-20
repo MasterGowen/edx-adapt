@@ -101,9 +101,9 @@ class Users(Resource):
                 logger.info("Pre-assessment problem is found and selected: {}".format(first_prob))
             self.repo.set_next_problem(course_id, args['user_id'], first_prob)
         except DataException as e:
-            abort(500, message=str(e))
+            abort(500, message="Student cannot be enrolled because of database issues: {}".format(e))
         except SelectException as e:
-            abort(500, message=str(e))
+            abort(500, message="Student cannot be enrolled because of next problem selecting issues: {}".format(e))
         return {'success': True}, 200
 
 

@@ -68,17 +68,6 @@ def get_parameters(required=REQUIRED_PARAMS):
         )
     )
     parser.add_argument(
-        '--skills',
-        dest='skills',
-        type=str,
-        nargs='+',
-        required=True,
-        help=(
-            'sequence with skills student will be enrolled with, should be set as follow example: '
-            '"center" "shape" "spread" "x axis" "y axis" "h to d" "d to h" "histogram" "None"'
-        )
-    )
-    parser.add_argument(
         '-v',
         '--verbose',
         help='increase output verbosity'
@@ -87,17 +76,24 @@ def get_parameters(required=REQUIRED_PARAMS):
     return vars(params)
 
 
-def get_students_for_enrollment(path_to_file):
+def get_students_for_enrollment(headers, **kwargs):
     """
     Parse csv file with student anonymous data and prepare a list of students for enrollment in edx-adapt.
     """
+    path_to_file = kwargs['csvfile']
     if not os.path.exists(path_to_file):
         print("File with path: {} does not exist, please try again".format(path_to_file))
         sys.exit()
+    enrolled_students = get_enrolled_students(headers, **kwargs)
     with open(path_to_file) as csvfile:
         raw_students_ids = csv.DictReader(csvfile)
         for line in raw_students_ids:
-            yield line['Anonymized User ID']
+            user_id = line['Anonymized User ID']
+            key = (
+                'started' * (user_id in enrolled_students['started']) +
+                'updated' * (user_id in enrolled_students['not_started'])
+            )
+            yield user_id, key if key else 'enrolled'
 
 
 def check_users_already_started(users_list, headers=None, **kwargs):
@@ -146,37 +142,47 @@ def output_result(student_to_adapt, verbose=False):
 
 def main():
     parameters = get_parameters()
-    student_id_list = get_students_for_enrollment(parameters['csvfile'])
     headers = {'Content-type': 'application/json'}
-    enrolled_students = get_enrolled_students(headers, **parameters)
+    student_id_list = get_students_for_enrollment(headers, **parameters)
     student_to_adapt = {'enrolled': [], 'updated': [], 'started': []}
-    for student_id in student_id_list:
-        if student_id not in enrolled_students['started']:
-            if student_id in enrolled_students['not_started']:
-                student_to_adapt['updated'].append(student_id)
+    for student_id, key in student_id_list:
+        student_to_adapt[key].append(student_id)
+        if key == 'started':
+            continue
+        else:
+            payload = {
+                'course_id': parameters['course_id'],
+                'params': parameters['probabilities'],
+                'user_id': student_id,
+            }
+            req = requests.post(
+                'https://{host}:{port}/api/v1/parameters/bulk'.format(**parameters), json=payload, headers=headers
+            )
+            if req.status_code == 200:
+                print("student's skills are added")
             else:
-                student_to_adapt['enrolled'].append(student_id)
-            for skill in parameters['skills']:
-                payload = {
-                    'course_id': parameters['course_id'],
-                    'params': parameters['probabilities'],
-                    'user_id': student_id,
-                    'skill_name': skill
-                }
-                requests.post(
-                    'https://{host}:{port}/api/v1/parameters'.format(**parameters), json=payload, headers=headers
+                print(
+                    "Cannot create skills documemts for the student {}. Student cannot be enrolled without existed "
+                    "course skills. Please repeat enrollment procedure for this student ones more time.".format(
+                        student_id
+                    )
                 )
-            print("student's skill are added")
+                continue
 
             payload = {'user_id': student_id}
-            requests.post(
+            req = requests.post(
                 'https://{host}:{port}/api/v1/course/{course_id}/user'.format(**parameters),
                 json=payload,
                 headers=headers
             )
-            print("student {} is enrolled in course {}".format(student_id, parameters['course_id']))
-        else:
-            student_to_adapt['enrolled'].append(student_id)
+            if req.status_code == 200:
+                print("Student {} is enrolled on the course {}".format(student_id, parameters['course_id']))
+            else:
+                print(
+                    "Failed to enroll student {} to the course {}. Please repeat enrollment procedure for this student "
+                    "ones more time.".format(student_id, parameters['course_id'])
+                )
+                continue
     output_result(student_to_adapt, verbose=parameters['verbose'])
 
 
