@@ -115,7 +115,7 @@ class SkillSeparateRandomSelector(SelectInterface):
                 post = self.data_interface.get_all_remaining_posttest_problems(course_id, user_id)
                 if len(post) > 0:
                     for id in range(14):
-                        prob = 'Post_assessment_'+str(id)
+                        prob = 'Post_assessment_' + str(id)
                         for post_prob in post:
                             if post_prob['problem_name'] == prob:
                                 return post_prob

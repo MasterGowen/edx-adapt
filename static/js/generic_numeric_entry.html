@@ -182,10 +182,6 @@
 
 			//check to see if the user has the right answer
 			check_answers();
-
-			//resend last answer on page reload
-			if(state['attempts'] > 0)
-				edx_adapt.send_interaction(state['correct_answer'], state['attempts'], vars['user_id'], edx_adapt.get_problem_name());
 		}
 
 		function display_problem_callback(e)
