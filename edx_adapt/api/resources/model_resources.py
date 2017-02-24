@@ -81,10 +81,15 @@ class ParametersBulk(Resource):
         args = param_parser.parse_args()
         course = args['course_id']
         user = args['user_id']
+        default_param = None
+
         try:
             skills_list = self.repo.get_skills(course)
-
-            prob_list = self.repo.get_model_params(course)
+            logger.debug(
+                "Skills for the student {} are taken directly from the course {} in which student is enrolled".format(
+                    user, course
+                )
+            )
         except DataException:
             logger.exception(
                 "Skills field are not found in the course: {}, student's skills cannot be added".format(course)
@@ -95,15 +100,44 @@ class ParametersBulk(Resource):
                     course
                 )
             )
-        logger.info(
-            "Skills for the student {} are taken directly from the course {} in which student is enrolled".format(
-                user, course
+        try:
+            key = self.create_search_key(course, user)
+            default_param = self.repo.get(key) or self.repo.get_model_params(course)
+        except DataException:
+            logger.debug(
+                "Default model's parameters are not found, adapt enrolls user with parameters: {}".format(
+                    args['params']
+                )
             )
-        )
-        params = random.choice(prob_list) if prob_list else args['params']
+            pass
+        if default_param and isinstance(default_param, list):
+            params = random.choice(default_param)
+            logger.debug("Default model's parameters are found, adapt enrolls user with parameters: {}".format(params))
+        elif default_param:
+            params = default_param
+            logger.debug(
+                "Adapt enrolls user with parameters which is already used by the user in other adaptive course's "
+                "section: {}".format(params)
+            )
+        else:
+            params = args['params']
         try:
             for skill in skills_list:
                 self.selector.set_parameter(params, course, user, skill)
         except SelectException as e:
             abort(500, message=str(e))
         return {'success': True, 'configuredSkills': skills_list}, 201
+
+    @staticmethod
+    def create_search_key(course, user):
+        """
+        Creates key value with regular expression for $regex query in MongoDB collection
+
+        :param course: course_id
+        :param user: user_id
+        :return: dict for MongoDB query
+        """
+        # For regex query we need main part of the course_id either course_id complex (with section part) or not
+        main_course = course.split(':')[0]
+        course_escape = main_course.replace('+', '\\+')  # '+' char should be escaped with '\'
+        return {'$regex': '{course_id}.+{user_id}'.format(course_id=course_escape, user_id=user)}
