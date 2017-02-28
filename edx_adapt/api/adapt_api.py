@@ -7,7 +7,6 @@ import edx_adapt.api.resources.course_resources as CR
 import edx_adapt.api.resources.tutor_resources as TR
 import edx_adapt.api.resources.data_serve_resources as DR
 import edx_adapt.api.resources.model_resources as MR
-import edx_adapt.api.resources.etc_resources as ER
 # import data and model stuff
 import edx_adapt.data.course_repository as repo
 import edx_adapt.data.mongodb_storage as mongodbstore
@@ -70,31 +69,6 @@ api.add_resource(MR.Parameters, base+'/parameters',
                  resource_class_kwargs={'data': database, 'selector': selector})
 
 api.add_resource(MR.ParametersBulk, base+'/parameters/bulk',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-
-api.add_resource(ER.HitID, base+'/misc/hitID',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(ER.LoadBOParamsForUser, base+'/course/<course_id>/user/<user_id>/LoadBOParams',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(ER.PostBOParameters, base+'/misc/SetBOParams',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(ER.EZHitIDSetter, base+'/misc/EZhitID/<hitid>',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(ER.LoopLog, base+'/misc/log',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(ER.LoopRunner, base+'/misc/start/course/<course_id>',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(ER.HitChecker5000, base+'/misc/hitcheck/course/<course_id>',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(ER.ClearLog, base+'/misc/log/clear',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(ER.BOPoints, base+'/course/<course_id>/BOPoints',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(ER.BORunner, base+'/misc/RunBO/course/<course_id>',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(ER.HitExtendNoBO, base+'/misc/hitextend',
-                 resource_class_kwargs={'data': database, 'selector': selector})
-api.add_resource(ER.DataExport, base+'/misc/dataexport',
                  resource_class_kwargs={'data': database, 'selector': selector})
 
 

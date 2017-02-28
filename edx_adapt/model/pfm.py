@@ -1,6 +1,7 @@
 import math
 from interface import ModelInterface
 
+
 class PFM(ModelInterface):
     """ This is an example implementation of a student model interface.
     Performance Factor Model uses logistic regression to model
@@ -9,7 +10,7 @@ class PFM(ModelInterface):
     and the number of questions the student got wrong until now
     """
 
-    counts = [0, 0] # Number of problems the student got incorrect and correct respectively
+    counts = [0, 0]  # Number of problems the student got incorrect and correct respectively
 
     def get_probability_correct(self, num_pretest, trajectory, parameters):
         """
@@ -25,7 +26,6 @@ class PFM(ModelInterface):
             self.counts[correctness] += 1
         return self.get_current_probability_correct(parameters)
 
-
     def get_current_probability_correct(self, params):
         """
         Computes the probability of getting the next problem correct
@@ -34,4 +34,10 @@ class PFM(ModelInterface):
         :param params: dictionary of parameters containing pi, pt, pg, ps
         :return: probability of getting the next problem correct
         """
-        return 1.0 / (1 + math.exp(-(params['beta_intercept'] + params['beta_incorrect'] * self.counts[0] + params['beta_correct'] * self.counts[1])))
+        return (
+            1.0 / (1 + math.exp(-(
+                        params['beta_intercept'] +
+                        params['beta_incorrect'] * self.counts[0] +
+                        params['beta_correct'] * self.counts[1]
+                    )))
+        )

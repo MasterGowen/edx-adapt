@@ -1,11 +1,10 @@
 """ This file contains api resources for serving data from the course.
 """
 
-from flask_restful import Resource, abort, reqparse
+from flask_restful import Resource, abort
 
 from edx_adapt.data.interface import DataException
 from edx_adapt import logger
-from edx_adapt.select.interface import SelectException
 
 """ First, all requests for logs """
 
