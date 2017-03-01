@@ -57,7 +57,6 @@ class BaseTestCase(unittest.TestCase):
         }
         _setup_course_in_edxadapt(cls.app, **cls.params)
 
-
     @classmethod
     def tearDownClass(cls):
         # NOTE(idegtiarov) sqlite is too slow for using on server we will support only MongoDB
@@ -65,19 +64,25 @@ class BaseTestCase(unittest.TestCase):
         # TODO(idegtiarov) improve application start-up to use another database name for tests
         mclient.drop_database('edx-adapt')
 
-    def _answer_pre_assessment_problems(self, correct_answers=0, attention_question=True):
+    def setUp(self):
+        # set up new student
+        self.student_name = 'test_student_' + id_generator()
+
+        self.app.post(
+            base_api_path + '/{}/user'.format(self.course_id),
+            data=json.dumps({'user_id': self.student_name}),
+            headers=self.headers
+        )
+
+    def _answer_pre_assessment_problems(self, correct_answers=0):
         """
         Automation fulfilling Pre-Assessment problems
 
         :param correct_answers: int, Number of correct answers
-        :param attention_question: bool, by default one of correct answers id assigned to AttentionQuestion
         """
         pre_assessments = ['Pre_assessment_{}'.format(i) for i in range(0, 14)]
         for answered_problem, problem in enumerate(pre_assessments):
-            is_correct = (
-                answered_problem < correct_answers - attention_question or
-                (correct_answers and attention_question and answered_problem == len(pre_assessments) - 1)
-            )
+            is_correct = answered_problem < correct_answers
             data = {'problem': problem, 'correct': is_correct, 'attempt': 1}
             self.app.post(
                 base_api_path + '/{}/user/{}/interaction'.format(self.course_id, self.student_name),
@@ -114,6 +119,10 @@ class BaseTestCase(unittest.TestCase):
             })
             self.app.post('/api/v1/parameters', data=payload, headers=self.headers)
 
+    def _get_problems_num(self, pretest=None, posttest=None):
+        """Returns number of the problems registered in the course"""
+        return len(adapt_api.database.get_problems(self.course_id, pretest=pretest, posttest=posttest))
+
 
 class CourseTestCase(BaseTestCase):
     def test_course_created(self):
@@ -128,9 +137,8 @@ class CourseTestCase(BaseTestCase):
     def test_course_problem_fulfilled(self):
         problems = json.loads(self.app.get(base_api_path + '/{}'.format(self.course_id)).data)
         self.assertTrue(problems, msg='Not any problem is found in course')
-        # NOTE(idegtiarov) Assert correct value is based on amount of problems defined in problems.csv file, if this
-        # file is changed test will fail.
-        self.assertEqual(84, len(problems['problems']))
+        expecting_problems_number = self._get_problems_num()
+        self.assertEqual(expecting_problems_number, len(problems['problems']))
 
     def test_course_experiment_fulfilled(self):
         experiments = json.loads(self.app.get(base_api_path + '/{}/experiment'.format(self.course_id)).data)
@@ -148,14 +156,7 @@ class CourseTestCase(BaseTestCase):
 
 class PreAssessmentTestCase(BaseTestCase):
     def setUp(self):
-        # set up new student
-        self.student_name = 'test_student_' + id_generator()
-
-        self.app.post(
-            base_api_path + '/{}/user'.format(self.course_id),
-            data=json.dumps({'user_id': self.student_name}),
-            headers=self.headers
-        )
+        super(PreAssessmentTestCase, self).setUp()
         # Default student params
         probabilities = {'pg': 0.25, 'ps': 0.25, 'pi': 0.1, 'pt': 0.5, 'threshold': 0.99}
 
@@ -172,23 +173,17 @@ class PreAssessmentTestCase(BaseTestCase):
 
     def test_student_cut_off_after_all_correct_answers(self):
         """
-        Test student got status "done_with_course" after answering correctly on all pre-assessment problems.
+        Test student got status "done_with_course" after answering correctly on more than half pre-assessment problems.
         """
-        self._answer_pre_assessment_problems(correct_answers=8, attention_question=False)
+        # Course is done if more than half
+        correct_pretest_to_done_course = self._get_problems_num(pretest=True) // 2 + 1
+        self._answer_pre_assessment_problems(correct_answers=correct_pretest_to_done_course)
 
         status = json.loads(self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data)
         self.assertEqual(True, status['done_with_course'])
 
 
 class MainLogicTestCase(BaseTestCase):
-    def setUp(self):
-        self.student_name = 'test_student_' + id_generator()
-        self.app.post(
-            base_api_path + '/{}/user'.format(self.course_id),
-            data=json.dumps({'user_id': self.student_name}),
-            headers=self.headers
-        )
-
     def test_alternative_parameters_set_one(self):
         """
         Test student with alternative parameter set one (no need to go through course if pre-assessment not fault).
@@ -210,18 +205,23 @@ class MainLogicTestCase(BaseTestCase):
         probabilities = {'pg': 0.5, 'ps': 0.5, 'pi': 0.01, 'pt': 0.01, 'threshold': 0.95}
         self._add_probabilities_to_user_skill(probabilities)
         self._answer_pre_assessment_problems(correct_answers=5)
-        pre_and_post_assessment = 28  # Sum of pre-assessment and post-assessment problems
-        # NOTE(idegtiarov) to ensure that all problems in main part was touched we check that before answered
-        # all 'main' part's problems edx-adapt doesn't propose problem from Post_assessment part
-        given_answer = (
-            len(adapt_api.database.get_problems(self.course_id)) - pre_and_post_assessment - 1)
-        for _ in range(given_answer):
+
+        given_answer = self._get_problems_num(pretest=False, posttest=False)
+        # Checking there is no Post_assessment problem set to "next" before all generic problems are answered
+        for _ in range(given_answer - 1):
             self._answer_problem()
             next_problem = json.loads(
                 self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
             )['next']
             self.assertFalse(next_problem['posttest'])
             self.assertFalse(next_problem['problem_name'].startswith('Post_assessment'))
+        # Checking finally get Post assessment problem in "next" after all generic problems are answered
+        self._answer_problem()
+        next_problem = json.loads(
+            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
+        )['next']
+        self.assertTrue(next_problem['posttest'])
+        self.assertTrue(next_problem['problem_name'].startswith('Post_assessment'))
 
     def test_default_parameter_set(self):
         """
@@ -234,40 +234,8 @@ class MainLogicTestCase(BaseTestCase):
         probabilities = {'pg': 0.25, 'ps': 0.25, 'pi': 0.1, 'pt': 0.5, 'threshold': 0.99}
         self._add_probabilities_to_user_skill(probabilities)
         self._answer_pre_assessment_problems(correct_answers=5)
-        next_problem = json.loads(
-            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
-        )['next']
-        # NOTE(idegtiarov) ['b3', 'b4', 'b3_2_0'] is list of baseline problems which are mandatory to student after
-        # pre_assessment part is successfully passed
-        self.assertEqual('b3', next_problem['problem_name'])
 
-        self._answer_problem()
-        next_problem = json.loads(
-            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
-        )['next']
-        self.assertEqual('b4', next_problem['problem_name'])
-
-        self._answer_problem()
-        next_problem = json.loads(
-            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
-        )['next']
-        self.assertEqual('b3_2_0', next_problem['problem_name'])
-        # NOTE(idegtiarov) problems 'labels_we' and 'skew_easy_0' are defined as always to do and they are proposed
-        # after baseline problems
-        self._answer_problem()
-        next_problem = json.loads(
-            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
-        )['next']
-        self.assertEqual('labels_we', next_problem['problem_name'])
-
-        self._answer_problem()
-        next_problem = json.loads(
-            self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data
-        )['next']
-        self.assertEqual('skew_easy_0', next_problem['problem_name'])
-        # NOTE(idegtiarov) next problems come in random order on three of them student answers correctly from second
-        # attempt
-        self._answer_problem()
+        self._answer_problem(repeat=5)
         self._answer_problem(correct=False)
         status = json.loads(
             self.app.get(base_api_path + '/{}/user/{}'.format(self.course_id, self.student_name)).data

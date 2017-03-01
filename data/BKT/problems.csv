@@ -61,7 +61,6 @@ Pre_assessment_8,center
 Pre_assessment_9,spread
 shape_0,shape
 shape_1,shape
-skew_easy_0,None
 skew_easy_1,shape
 skew_easy_2,shape
 skew_easy_3,shape
@@ -81,4 +80,3 @@ t4_2_1,histogram
 t5_center,center
 t5_shape,shape
 t5_spread,spread
-labels_we,None

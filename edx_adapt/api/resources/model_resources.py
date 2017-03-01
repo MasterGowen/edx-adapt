@@ -2,8 +2,9 @@
 """
 import random
 
-from flask_restful import Resource, abort, reqparse
+from flask_restful import abort, reqparse
 
+from edx_adapt.api.resources.base_resource import BaseResource
 from edx_adapt.data.interface import DataException
 from edx_adapt import logger
 from edx_adapt.select.interface import SelectException
@@ -12,19 +13,16 @@ param_parser = reqparse.RequestParser()
 param_parser.add_argument('course_id', type=str, location='json', help="Optionally supply a course id")
 param_parser.add_argument('user_id', type=str, location='json', help="Optionally supply a user ID")
 param_parser.add_argument('skill_name', type=str, location='json', help="Optionally supply the name of a skill")
-param_parser.add_argument('params', type=dict, location='json', required=True,
-                          help="Please supply the desired model parameters as a dictionary")
+param_parser.add_argument(
+    'params',
+    type=dict,
+    location='json',
+    required=True,
+    help="Please supply the desired model parameters as a dictionary",
+)
 
 
-class Parameters(Resource):
-    def __init__(self, **kwargs):
-        """
-        @type repo: DataInterface
-        @type selector: SelectInterface
-        """
-        self.repo = kwargs['data']
-        self.selector = kwargs['selector']
-
+class Parameters(BaseResource):
     def get(self):
         param_list = []
         try:
@@ -48,7 +46,7 @@ class Parameters(Resource):
         except SelectException as e:
             abort(500, message=str(e))
 
-        return {'success': True}, 200
+        return {'success': True}, 201
 
 param_bulk_parser = reqparse.RequestParser()
 param_bulk_parser.add_argument('course_id', type=str, location='json', help="Optionally supply a course id")
@@ -61,22 +59,11 @@ param_bulk_parser.add_argument(
     type=dict,
     location='json',
     required=True,
-    help="Please supply the desired model parameters as a dictionary")
+    help="Please supply the desired model parameters as a dictionary",
+)
 
 
-class ParametersBulk(Resource):
-    def __init__(self, **kwargs):
-        self.repo = kwargs['data']
-        self.selector = kwargs['selector']
-
-    def get(self):
-        param_list = []
-        try:
-            param_list = self.selector.get_all_parameters()
-        except SelectException as e:
-            abort(500, message=str(e))
-        return {'parameters': param_list}, 200
-
+class ParametersBulk(Parameters):
     def post(self):
         args = param_parser.parse_args()
         course = args['course_id']

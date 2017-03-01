@@ -36,8 +36,8 @@ class PFM(ModelInterface):
         """
         return (
             1.0 / (1 + math.exp(-(
-                        params['beta_intercept'] +
-                        params['beta_incorrect'] * self.counts[0] +
-                        params['beta_correct'] * self.counts[1]
-                    )))
+                params['beta_intercept'] +
+                params['beta_incorrect'] * self.counts[0] +
+                params['beta_correct'] * self.counts[1]
+            )))
         )

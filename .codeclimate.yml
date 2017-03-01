@@ -1,0 +1,43 @@
+# Serves for configuration of CodeClimate (automated code review for test coverage, complexity, duplication, etc.)
+engines:
+  radon:
+    enabled: true
+    config:
+      python_version: 2
+      threshold: "C"
+    exclude_fingerprints:
+    # It is not needed to fight for cyclomatic complexity decreasing in tools/** scripts
+    - 986c7c1735f2a2e2a6500e7148ea4bd5  # cyclomatic complexity in course_setup.py
+    - ec3a2e4e4d53fb59016309bd007df078  # cyclomatic complexity in transform_to_adapt/transform_problems.py
+  fixme:
+    enabled: true
+    config:
+      strings:
+        - FIXME
+        - BUG
+        - CUSTOM
+        - TODO
+  duplication:
+    enabled: true
+    config:
+      languages:
+        - javascript:
+        - python:
+            python_version: 2
+    exclude_fingerprints:
+    # Probabilities POST and PUT methods are marked as duplication
+      - 4e06d64888f1f615bfcf51416844dca5
+  eslint:
+    enabled: true
+  markdownlint:
+    enabled: true
+    exclude_fingerprints:
+    # Long line in Code block marked as long, but length checking is not expected in code blocks
+      - 7e02053fa411ee2f67df597e15d10148
+
+ratings:
+   paths:
+   - "**.js"
+   - "**.py"
+   - "**.md"
+

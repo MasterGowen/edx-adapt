@@ -1,5 +1,3 @@
-"""Repository that implements DataInterface using a tinydb backend """
-
 from datetime import datetime
 
 import interface
@@ -82,14 +80,8 @@ class CourseRepositoryMongo(interface.DataInterface):
             }
         )
 
-    def post_problem(self, course_id, skill_names, problem_name, tutor_url):
-        self._add_problem(course_id, skill_names, problem_name, tutor_url, False, False)
-
-    def post_pretest_problem(self, course_id, skill_names, problem_name, tutor_url):
-        self._add_problem(course_id, skill_names, problem_name, tutor_url, True, False)
-
-    def post_posttest_problem(self, course_id, skill_names, problem_name, tutor_url):
-        self._add_problem(course_id, skill_names, problem_name, tutor_url, False, True)
+    def post_problem(self, course_id, skill_names, problem_name, tutor_url, pretest=False, posttest=False):
+        self._add_problem(course_id, skill_names, problem_name, tutor_url, pretest, posttest)
 
     def enroll_user(self, course_id, user_id):
         coll = course_id + COLL_SUFFIX['user_problem']
@@ -133,26 +125,33 @@ class CourseRepositoryMongo(interface.DataInterface):
     def get_course_ids(self):
         return self.store.get_tables()
 
-    def get_problems(self, course_id, skill_name=None):
+    @staticmethod
+    def _compose_search_dict(**kwargs):
+        return {key: val for key, val in kwargs.iteritems() if val is not None}
+
+    def get_problems(self, course_id, skill_name=None, pretest=None, posttest=None):
         """
         Get all problems related to this course-skill pre-test, normal, and post-test
 
         :param course_id: string ID of the course
         :param skill_name: string (optional) name of the skill
+        :param pretest: boolean (optional) flag to return pretest or not pretest problems
+        :param posttest: boolean (optional) flag to return posttest or not posttest problems
         :return: list of problems
         """
-        problems = self.store.course_get(course_id, 'problems')
-        if skill_name:
-            return [problem for problem in problems if skill_name in problem['skills']]
-        return problems
+        skills = [skill_name] if skill_name else None
+        search_dict = self._compose_search_dict(skills=skills, pretest=pretest, posttest=posttest)
+        if search_dict:
+            problems_doc = self.store.course_problems_search(course_id, search_dict)
+            return problems_doc if problems_doc else []
+        else:
+            return self.store.course_get(course_id, 'problems')
 
-    def get_num_pretest(self, course_id, skill_name):
-        pretest = [x for x in self.get_problems(course_id, skill_name) if x['pretest'] is True]
-        return len(pretest)
+    def get_num_pretest(self, course_id, skill_name=None):
+        return len(self.get_problems(course_id, skill_name, pretest=True))
 
-    def get_num_posttest(self, course_id, skill_name):
-        posttest = [x for x in self.get_problems(course_id, skill_name) if x['posttest'] is True]
-        return len(posttest)
+    def get_num_posttest(self, course_id, skill_name=None):
+        return len(self.get_problems(course_id, skill_name, posttest=True))
 
     def get_in_progress_users(self, course_id):
         return self.store.course_get(course_id, 'users_in_progress')
@@ -167,7 +166,7 @@ class CourseRepositoryMongo(interface.DataInterface):
         if problems:
             return problems.get('problems')[0]
         else:
-            raise interface.DataException("Problem not found: {}".format(problem_name))
+            raise interface.DataException('Problem not found: {}'.format(problem_name))
 
     def post_interaction(self, course_id, problem_name, user_id, correct, attempt, unix_seconds):
         """
@@ -215,8 +214,6 @@ class CourseRepositoryMongo(interface.DataInterface):
             'type': 'page_load',
             'timestamp': datetime.fromtimestamp(unix_seconds).strftime('%Y-%m-%d %H:%M:%S')
         }
-        # NOTE(idegtiarov) checking that load was already stored for this problem doesn't need if we are interesting in
-        # correct statistic and logging additional/same data is ok
         self.store.record_data(coll, data)
 
     def set_next_problem(self, course_id, user_id, problem_dict):
@@ -237,36 +234,35 @@ class CourseRepositoryMongo(interface.DataInterface):
         self.store.update_doc(coll, {'student_id': user_id}, {'$set': {'current': current_problem, 'next': None}})
 
     def get_all_remaining_problems(self, course_id, user_id):
-        return [x for x in self._get_remaining_by_user(course_id, user_id)
-                if x['pretest'] is False and x['posttest'] is False]
+        return self._get_remaining_by_user(course_id, user_id, pretest=False, posttest=False)
 
     def get_remaining_problems(self, course_id, skill_name, user_id):
-        remaining = self.get_all_remaining_problems(course_id, user_id)
-        return [x for x in remaining if skill_name in x['skills']]
+        return self._get_remaining_by_user(course_id, user_id, skill_name, pretest=False, posttest=False)
 
     def get_all_remaining_posttest_problems(self, course_id, user_id):
-        return [x for x in self._get_remaining_by_user(course_id, user_id) if x['posttest'] is True]
+        return self._get_remaining_by_user(course_id, user_id, posttest=True)
 
     def get_remaining_posttest_problems(self, course_id, skill_name, user_id):
-        remaining = self.get_all_remaining_posttest_problems(course_id, user_id)
-        return [x for x in remaining if skill_name in x['skills']]
+        return self._get_remaining_by_user(course_id, user_id, skill_name, posttest=True)
 
     def get_all_remaining_pretest_problems(self, course_id, user_id):
-        return [x for x in self._get_remaining_by_user(course_id, user_id) if x['pretest'] is True]
+        return self._get_remaining_by_user(course_id, user_id, pretest=True)
 
     def get_remaining_pretest_problems(self, course_id, skill_name, user_id):
-        remaining = self.get_all_remaining_pretest_problems(course_id, user_id)
-        return [x for x in remaining if skill_name in x['skills']]
+        return self._get_remaining_by_user(course_id, user_id, skill_name, pretest=True)
 
-    def _get_remaining_by_user(self, course_id, user_id):
+    def _get_remaining_by_user(self, course_id, user_id, skill_name=None, pretest=None, posttest=None):
         coll = course_id + COLL_SUFFIX['log']
-        done = self.store. get_statistics(
+        done = self.store.get_statistics(
             coll, user_id, {'type': 'response'}, 'done', op='$addToSet', op_value='$problem')
         if done.alive:
             done = done.next()['done']
-            return [problem for problem in self.get_problems(course_id) if problem not in done]
+            return [
+                problem for problem in self.get_problems(course_id, skill_name, pretest, posttest)
+                if problem not in done
+            ]
         else:
-            return self.get_problems(course_id)
+            return self.get_problems(course_id, pretest=pretest, posttest=posttest)
 
     def post_experiment(self, course_id, experiment_name, start, end):
         experiment = {'experiment_name': experiment_name, 'start_time': start, 'end_time': end}
@@ -328,13 +324,15 @@ class CourseRepositoryMongo(interface.DataInterface):
         coll = course_id + COLL_SUFFIX['log']
         return self.store.get_user_logs(coll, user_id, add_filter={'problem.skills': skill_name})
 
-    def get_next_problem(self, course_id, user_id):
+    def _get_user_problem(self, course_id, user_id, cur_or_next):
         coll = course_id + COLL_SUFFIX['user_problem']
-        return self.store.get_one(coll, user_id, 'next')
+        return self.store.get_one(coll, user_id, cur_or_next)
+
+    def get_next_problem(self, course_id, user_id):
+        return self._get_user_problem(course_id, user_id, 'next')
 
     def get_current_problem(self, course_id, user_id):
-        coll = course_id + COLL_SUFFIX['user_problem']
-        return self.store.get_one(coll, user_id, 'current')
+        return self._get_user_problem(course_id, user_id, 'current')
 
     def get_all_interactions(self, course_id, user_id):
         coll = course_id + COLL_SUFFIX['log']

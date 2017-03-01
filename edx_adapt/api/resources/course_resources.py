@@ -2,8 +2,9 @@
 For example, CRUDding courses, users, problems, skills...
 """
 
-from flask_restful import Resource, abort, reqparse
+from flask_restful import abort, reqparse
 
+from edx_adapt.api.resources.base_resource import BaseResource
 from edx_adapt.data.interface import DataException
 from edx_adapt import logger
 from edx_adapt.select.interface import SelectException
@@ -12,78 +13,56 @@ course_parser = reqparse.RequestParser()
 course_parser.add_argument('course_id', type=str, required=True, location='json', help="Please supply a course ID")
 
 
-class Courses(Resource):
-    def __init__(self, **kwargs):
-        self.repo = kwargs['data']
-        """@type repo: DataInterface"""
-
-    def get(self):
-        courses = []
+class DefaultResource(BaseResource):
+    def _post_request(self, function_name, *args, **kwargs):
         try:
-            courses = self.repo.get_course_ids()
+            getattr(self.repo, function_name)(*args, **kwargs)
         except DataException as e:
+            logger.exception('DataException: ')
             abort(500, message=str(e))
+        return {'success': True}, 201
+
+    def _get_request(self, function_name, *args):
+        output_list = []
+        try:
+            output_list = getattr(self.repo, function_name)(*args)
+        except DataException as e:
+            logger.exception('DataException:')
+            abort(404, message=str(e))
+        return output_list
+
+
+class Courses(DefaultResource):
+    def get(self):
+        courses = self._get_request('get_course_ids')
         return {'course_ids': courses}, 200
 
     def post(self):
         args = course_parser.parse_args()
-        try:
-            self.repo.post_course(args['course_id'])
-        except DataException as e:
-            abort(500, message=str(e))
-
-        return {'success': True}, 200
-
+        return self._post_request('post_course', args['course_id'])
 
 skill_parser = reqparse.RequestParser()
 skill_parser.add_argument('skill_name', type=str, required=True, location='json',
                           help="Please supply the name of a skill")
 
 
-class Skills(Resource):
-    def __init__(self, **kwargs):
-        self.repo = kwargs['data']
-        """@type repo: DataInterface"""
-
+class Skills(DefaultResource):
     def get(self, course_id):
-        skills = []
-        try:
-            skills = self.repo.get_skills(course_id)
-        except DataException as e:
-            abort(404, message=str(e))
-
+        skills = self._get_request('get_skills', course_id)
         return {'skills': skills}, 200
 
     def post(self, course_id):
         args = skill_parser.parse_args()
-        try:
-            self.repo.post_skill(course_id, args['skill_name'])
-        except DataException as e:
-            abort(500, message=str(e))
-
-        return {'success': True}, 200
-
+        return self._post_request('post_skill', course_id, args['skill_name'])
 
 user_parser = reqparse.RequestParser()
 user_parser.add_argument('user_id', type=str, required=True, location='json', help="Please supply a user ID")
 
 
-class Users(Resource):
-    def __init__(self, **kwargs):
-        self.repo = kwargs['data']
-        self.selector = kwargs['selector']
-        """@type repo: DataInterface"""
-        """@type selector: SelectInterface"""
-
+class Users(DefaultResource):
     def get(self, course_id):
-        finished_users = []
-        progress_users = []
-        try:
-            finished_users = self.repo.get_finished_users(course_id)
-            progress_users = self.repo.get_in_progress_users(course_id)
-        except DataException as e:
-            abort(404, message=str(e))
-
+        finished_users = self._get_request('get_finished_users', course_id)
+        progress_users = self._get_request('get_in_progress_users', course_id)
         return {'users': {'finished': finished_users, 'in_progress': progress_users}}, 200
 
     def post(self, course_id):
@@ -120,35 +99,23 @@ problem_parser.add_argument('posttest', type=bool, location='json',
                             help="Set True if this is a posttest problem. Mutually exclusive with pretest")
 
 
-class Problems(Resource):
-    def __init__(self, **kwargs):
-        self.repo = kwargs['data']
-        """@type repo: DataInterface"""
-
+class Problems(DefaultResource):
     def get(self, course_id, skill_name=None):
-        problems = []
-        try:
-            problems = self.repo.get_problems(course_id, skill_name)
-        except DataException as e:
-            abort(500, message=str(e))
-
+        problems = self._get_request('get_problems', course_id, skill_name)
         return {'problems': problems}, 200
 
     def post(self, course_id):
         args = problem_parser.parse_args()
         logger.debug("Post problem args: {}".format(args))
-        try:
-            if args['pretest']:
-                self.repo.post_pretest_problem(course_id, args['skills'], args['problem_name'], args['tutor_url'])
-            elif args['posttest']:
-                self.repo.post_posttest_problem(course_id, args['skills'], args['problem_name'], args['tutor_url'])
-            else:
-                self.repo.post_problem(course_id, args['skills'], args['problem_name'], args['tutor_url'])
-        except DataException as e:
-            abort(500, message=str(e))
-
-        return {'success': True}, 200
-
+        return self._post_request(
+            'post_problem',
+            course_id,
+            args['skills'],
+            args['problem_name'],
+            args['tutor_url'],
+            args['pretest'],
+            args['posttest']
+        )
 
 experiment_parser = reqparse.RequestParser()
 experiment_parser.add_argument('experiment_name', type=str, location='json', required=True,
@@ -159,57 +126,30 @@ experiment_parser.add_argument('end_time', type=int, location='json', required=T
                                help="Please supply the end date in unix seconds")
 
 
-class Experiments(Resource):
-    def __init__(self, **kwargs):
-        self.repo = kwargs['data']
-        """@type repo: DataInterface"""
-
+class Experiments(DefaultResource):
     def get(self, course_id):
-        exps = []
-        try:
-            exps = self.repo.get_experiments(course_id)
-        except DataException as e:
-            logger.exception("Data exception:")
-            abort(500, message=str(e))
+        exps = self._get_request('get_experiments', course_id)
         return {'experiments': exps}
 
     def post(self, course_id):
         args = experiment_parser.parse_args()
-        try:
-            self.repo.post_experiment(course_id, args['experiment_name'], args['start_time'], args['end_time'])
-        except DataException as e:
-            logger.exception("Data exception:")
-            abort(500, message=str(e))
+        return self._post_request(
+            'post_experiment', course_id, args['experiment_name'], args['start_time'], args['end_time']
+        )
 
 prob_parser = reqparse.RequestParser()
 prob_parser.add_argument('prob_list', type=list, location='json', help="Please supply list with default model_params")
 
 
-class Probabilities(Resource):
-    def __init__(self, **kwargs):
-        self.repo = kwargs['data']
-
+class Probabilities(DefaultResource):
     def get(self, course_id):
-        prob_list = []
-        try:
-            prob_list = self.repo.get_model_params(course_id)
-        except DataException as e:
-            abort(404, message=str(e))
-
+        prob_list = self._get_request('get_model_params', course_id)
         return {'model_params': prob_list}, 200
 
     def post(self, course_id):
         args = prob_parser.parse_args()
-        try:
-            self.repo.post_model_params(course_id, args['prob_list'], new=True)
-        except DataException as e:
-            abort(500, message=str(e))
-        return {'success': True}, 201
+        return self._post_request('post_model_params', course_id, args['prob_list'], new=True)
 
     def put(self, course_id):
         args = prob_parser.parse_args()
-        try:
-            self.repo.post_model_params(course_id, args['prob_list'])
-        except DataException as e:
-            abort(500, message=str(e))
-        return {'success': True}, 201
+        return self._post_request('post_model_params', course_id, args['prob_list'])

@@ -108,6 +108,38 @@ class MongoDbStorage(interface.StorageInterface):
             return self.db.Courses.find_one({'course_id': course_id, search_field: {'$elemMatch': search_condition}},
                                             {'_id': 0, projection_field: {'$elemMatch': projection_condition}})
 
+    def course_problems_search(self, course_id, search_dict):
+        """
+        Make search for problems in the Course collection
+
+        :param course_id: course id
+        :param search_dict: is a dict with filter conditions, e.g. {"skill_name"=name, "pretest"=True, "posttest"=True}
+        :return: list with found problems
+        """
+        cond = []
+        cond_key = "$$problem."
+
+        for key, value in search_dict.items():
+            cond.append({"$eq": [cond_key + key, value]})
+        problems = self.db.Courses.aggregate(
+            [
+                {"$match": {'course_id': course_id}},
+                {"$project": {
+                    "_id": 0, "problems": {
+                        "$filter": {
+                            "input": "$problems", "as": "problem", "cond": {"$and": cond}
+                        }
+                    }
+                }}
+            ]
+        )
+        if not problems.alive:
+            logger.warning("Problems with search request: {}; are not found in the course".format(
+                search_dict, course_id
+            ))
+            return []
+        return problems.next()["problems"]
+
     def update_doc(self, collection, search_dict, update_dict, new=False):
         """
         Update document in collection
@@ -151,7 +183,6 @@ class MongoDbStorage(interface.StorageInterface):
             {'$push': {'val': val}})
 
     def remove(self, table_name, list_key, val):
-        # TODO: do
         raise NotImplementedError("Storage module must implement this")
 
     def export(self, tables=None):

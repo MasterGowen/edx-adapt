@@ -1,21 +1,18 @@
-""" This file contains api resources for serving data from the course.
+"""
+This file contains api resources for serving data from the course.
 """
 
-from flask_restful import Resource, abort
+from flask_restful import abort
 
+from edx_adapt.api.resources.base_resource import BaseResource
 from edx_adapt.data.interface import DataException
 from edx_adapt import logger
 
-""" First, all requests for logs """
 
-
-class SingleProblemRequest(Resource):
+class SingleProblemRequest(BaseResource):
     """
     Handle request for a user's log on one problem
     """
-    def __init__(self, **kwargs):
-        """@type repo: DataInterface"""
-        self.repo = kwargs['data']
 
     def get(self, course_id, user_id, problem_name):
         problog = []
@@ -28,14 +25,10 @@ class SingleProblemRequest(Resource):
         return {'log': problog}
 
 
-class UserLogRequest(Resource):
+class UserLogRequest(BaseResource):
     """
     Handle request for a user's log
     """
-    def __init__(self, **kwargs):
-        """@type repo: DataInterface"""
-        self.repo = kwargs['data']
-
     def get(self, course_id, user_id):
         log = []
         try:
@@ -46,14 +39,10 @@ class UserLogRequest(Resource):
         return {'log': log}
 
 
-class CourseLogRequest(Resource):
+class CourseLogRequest(BaseResource):
     """
     Handle request for logs from all users of a course
     """
-    def __init__(self, **kwargs):
-        """@type repo: DataInterface"""
-        self.repo = kwargs['data']
-
     def get(self, course_id):
         data = {}
         try:
@@ -69,14 +58,10 @@ class CourseLogRequest(Resource):
         return {'log': data}
 
 
-class ExperimentLogRequest(Resource):
+class ExperimentLogRequest(BaseResource):
     """
     Handle request for logs from all users from an experiment (only gives logs for finished users)
     """
-    def __init__(self, **kwargs):
-        """@type repo: DataInterface"""
-        self.repo = kwargs['data']
-
     def get(self, course_id, experiment_name):
         data = {}
         try:
@@ -90,7 +75,27 @@ class ExperimentLogRequest(Resource):
             abort(500, message=str(e))
         return {'log': data}
 
-""" Now requests for trajectories """
+
+def _fulfill_correct(repo, course_id, user_id):
+    correct = {}
+    correct['pretest'] = [x['correct'] for x in repo.get_all_interactions(course_id, user_id)
+                          if x['problem']['pretest']]
+    correct['posttest'] = [x['correct'] for x in repo.get_all_interactions(course_id, user_id)
+                           if x['problem']['posttest']]
+    correct['problems'] = [x['correct'] for x in repo.get_all_interactions(course_id, user_id)
+                           if not (x['problem']['posttest'] and x['problem']['pretest'])]
+    return correct
+
+
+def _fulfill_skills(repo, course_id, user_id):
+    skills = {}
+    skills['pretest'] = [x['problem']['skills'][0] for x in repo.get_all_interactions(course_id, user_id)
+                         if x['problem']['pretest']]
+    skills['posttest'] = [x['problem']['skills'][0] for x in repo.get_all_interactions(course_id, user_id)
+                          if x['problem']['posttest']]
+    skills['problems'] = [x['problem']['skills'][0] for x in repo.get_all_interactions(course_id, user_id)
+                          if x['problem']['posttest'] is False and x['problem']['pretest'] is False]
+    return skills
 
 
 # helper function
@@ -99,17 +104,11 @@ def fill_user_data(repo, course_id, user_id):
     correct = {}
     num_pre = {}
     num_post = {}
-    skillz = {}
 
     data['all'] = repo.get_all_interactions(course_id, user_id)
     correct['all'] = repo.get_whole_trajectory(course_id, user_id)
 
-    correct['pretest'] = [x['correct'] for x in repo.get_all_interactions(course_id, user_id)
-                          if x['problem']['pretest']]
-    correct['posttest'] = [x['correct'] for x in repo.get_all_interactions(course_id, user_id)
-                           if x['problem']['posttest']]
-    correct['problems'] = [x['correct'] for x in repo.get_all_interactions(course_id, user_id)
-                           if x['problem']['posttest'] is False and x['problem']['pretest'] is False]
+    correct.update(_fulfill_correct(repo, course_id, user_id))
 
     data['by_skill'] = {}
     correct['by_skill'] = {}
@@ -120,45 +119,37 @@ def fill_user_data(repo, course_id, user_id):
         num_pre[skill] = repo.get_num_pretest(course_id, skill)
         num_post[skill] = repo.get_num_posttest(course_id, skill)
 
-    skillz['pretest'] = [x['problem']['skills'][0] for x in repo.get_all_interactions(course_id, user_id)
-                         if x['problem']['pretest']]
-    skillz['posttest'] = [x['problem']['skills'][0] for x in repo.get_all_interactions(course_id, user_id)
-                          if x['problem']['posttest']]
-    skillz['problems'] = [x['problem']['skills'][0] for x in repo.get_all_interactions(course_id, user_id)
-                          if x['problem']['posttest'] is False and x['problem']['pretest'] is False]
+    skills = _fulfill_skills(repo, course_id, user_id)
 
-    blob = {'data': data, 'trajectories': correct, 'trajectory_skills': skillz, 'pretest_length': num_pre,
-            'posttest_length': num_post}
+    blob = {
+        'data': data,
+        'trajectories': correct,
+        'trajectory_skills': skills,
+        'pretest_length': num_pre,
+        'posttest_length': num_post
+    }
     return blob
 
 
-class UserTrajectoryRequest(Resource):
+class UserTrajectoryRequest(BaseResource):
     """
     Handle request for a user's trajectories
     """
-    def __init__(self, **kwargs):
-        """@type repo: DataInterface"""
-        self.repo = kwargs['data']
-
     def get(self, course_id, user_id):
-        blob = {'data':{}, 'trajectories':{}, 'pretest_length': {}, 'posttest_length': {}}
+        blob = {'data': {}, 'trajectories': {}, 'pretest_length': {}, 'posttest_length': {}}
         try:
             blob = fill_user_data(self.repo, course_id, user_id)
 
         except DataException as e:
-            logger.error("Data exception: {}".format(e))
+            logger.exception("Data exception:")
             abort(500, message=str(e))
         return blob
 
 
-class CourseTrajectoryRequest(Resource):
+class CourseTrajectoryRequest(BaseResource):
     """
     Handle request for logs from all users of a course
     """
-    def __init__(self, **kwargs):
-        """@type repo: DataInterface"""
-        self.repo = kwargs['data']
-
     def get(self, course_id):
         userblobs = {}
         try:
@@ -175,14 +166,10 @@ class CourseTrajectoryRequest(Resource):
         return userblobs
 
 
-class ExperimentTrajectoryRequest(Resource):
+class ExperimentTrajectoryRequest(BaseResource):
     """
     Handle request for logs from all users from an experiment (only gives logs for finished users)
     """
-    def __init__(self, **kwargs):
-        """@type repo: DataInterface"""
-        self.repo = kwargs['data']
-
     def get(self, course_id, experiment_name):
         userblobs = {}
         try:
@@ -196,5 +183,3 @@ class ExperimentTrajectoryRequest(Resource):
             logger.error("Data exception: {}".format(e))
             abort(500, message=str(e))
         return userblobs
-
-#TODO: serve by date maybe...?

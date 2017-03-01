@@ -1,101 +1,92 @@
-""" This file contains api resources for interacting with the tutor
-as users take the course.
 """
-
-import threading
+This file contains api resources for interacting with the tutor as users take the course.
+"""
 import time
 
-from flask_restful import Resource, abort, reqparse
+from flask_restful import abort, reqparse
 
+from edx_adapt.api.resources.base_resource import BaseResource
 from edx_adapt.data.interface import DataException
 from edx_adapt import logger
 from edx_adapt.select.interface import SelectException
 
 
-class UserProblems(Resource):
+class DefaultResource(BaseResource):
+    def run_selector(self, course_id, user_id):
+        """
+        Run the problem selection sequence
+        """
+        nex = self.repo.get_next_problem(course_id, user_id)
+
+        # only run if no next problem has been selected yet, or there was an error previously
+        if nex is None or 'error' in nex:
+            logger.info("SELECTOR CHOOSING NEXT PROBLEM")
+            prob = self.selector.choose_next_problem(course_id, user_id)
+            logger.info("FINISHED CHOOSING NEXT PROBLEM: {}".format(str(prob)))
+            self.repo.set_next_problem(course_id, user_id, prob)
+        else:
+            logger.info("SELECTION NOT REQUIRED!")
+
+    def _rotate_problem(self, next_problem, course_id, user_id, **args):
+        if next_problem and 'error' not in next_problem and args['problem'] == next_problem.get('problem_name'):
+            self.repo.advance_problem(course_id, user_id)
+
+
+class UserProblems(DefaultResource):
     """
     Handle request for user's current and next problem.
     """
-    # Name of the question to test whether the user is paying attention on pretest.
-    ATTENTION_QUESTION_NAME = 'Pre_assessment_13'
+    def _check_current_done(self, course_id, user_id, current):
+        log = self.repo.get_raw_user_data(course_id, user_id)
+        done_with_current = any(
+            [x for x in log if x['type'] == 'response' and
+             x['problem']['problem_name'] == current['problem_name'] and x['correct'] == 1]
+        )
 
-    def __init__(self, **kwargs):
-        """
-        @type repo: DataInterface
-        """
-        self.repo = kwargs['data']
+        # account for test questions: user is "done" after they input any answer
+        if not done_with_current and (current["pretest"] or current["posttest"]):
+            done_with_current = any([x for x in log if x['type'] == 'response'])
+        return done_with_current
+
+    def _check_course_done(self, course_id, user_id):
+        fin = self.repo.get_finished_users(course_id)
+        done_with_course = user_id in fin
+        if not done_with_course:
+            answers = self.repo.get_all_interactions(course_id, user_id)
+            done_with_course = (
+                # Course set to be done if student answer correctly on more than a half of pre-assessment problems
+                sum([x['correct'] for x in answers if (x['problem']['pretest'])]) > (
+                    self.repo.get_num_pretest(course_id) // 2
+                )
+            )
+        return done_with_course
 
     def get(self, course_id, user_id):
-        nex = {}
-        cur = {}
         try:
             nex = self.repo.get_next_problem(course_id, user_id)
             cur = self.repo.get_current_problem(course_id, user_id)
         except DataException as e:
             abort(404, message=e.message)
 
-        okay = True
-        if not nex or 'error' in nex:
-            okay = False
+        okay = bool(nex and 'error' not in nex)
 
-        done_with_current = False
         done_with_course = False
-
         if not cur:
             done_with_current = True
         else:
             try:
-                log = self.repo.get_raw_user_data(course_id, user_id)
-                current_correct = [x for x in log if x['type'] == 'response' and
-                                   x['problem']['problem_name'] == cur['problem_name'] and x['correct'] == 1]
-                done_with_current = (len(current_correct) > 0)
-
-                # account for test questions: user is "done" after they input any answer
-                if cur["pretest"] or cur["posttest"]:
-                    if len([x for x in log if x['type'] == 'response']) > 0:
-                        done_with_current = True
-
-                fin = self.repo.get_finished_users(course_id)
-                if user_id in fin:
-                    done_with_course = True
-                # reject high pretest scores
-                # if more than 7 out of the first 13 pretest questions are correct -
-                # then the user knows too much already (ATTENTION_QUESTION_NAME
-                # is only for checking that the user is paying attention,
-                # not knowledge assessment, so skip it)
-                # FIXME(idegtirov) threshold for pre_assessment problems should be changed from int to percentage
-                answers = self.repo.get_all_interactions(course_id, user_id)
-                if sum([
-                    x['correct'] for x in answers if (
-                        x['problem']['pretest'] and x['problem']['problem_name'] != UserProblems.ATTENTION_QUESTION_NAME
-                    )
-                ]) > 7:
-                    done_with_course = True
-                    nex = None
-                # if answer to ATTENTION_QUESTION_NAME is wrong -
-                # then filter out this user, because they are not paying
-                # attention and simply clicking buttons
-                pretest_done = len(self.repo.get_all_remaining_pretest_problems(course_id, user_id)) == 0
-                # Disable cut off of students who gave no correct answers at pre-assessment for easier debugging
-                # if pretest_done and (sum( [x['correct'] for x in answers if (x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME) ] ) < 1):
-                # if pretest_done and (
-                #     sum([x['correct'] for x in answers if (
-                #         x['problem']['pretest'] and x['problem']['problem_name'] == UserProblems.ATTENTION_QUESTION_NAME
-                #     )]) < 0
-                # ):
-                #     done_with_course = True
-                #     nex = None
+                done_with_current = self._check_current_done(course_id, user_id, cur)
+                done_with_course = self._check_course_done(course_id, user_id)
             except DataException as e:
-                logger.exception("DATA EXCEPTION:")
+                logger.exception("DATA EXCEPTION: ")
                 abort(500, message=str(e))
-
         return {
             "next": nex, "current": cur, "done_with_current": done_with_current, "okay": okay,
             "done_with_course": done_with_course
         }
 
 
-""" Argument parser for posting a user response """
+# Argument parser for posting a user response
 result_parser = reqparse.RequestParser()
 result_parser.add_argument('problem', type=str, required=True, location='json',
                            help="Must supply the name of the problem which the user answered")
@@ -105,104 +96,33 @@ result_parser.add_argument('attempt', type=int, required=True, location='json',
                            help="Must supply the attempt number, starting from 1 for the first attempt")
 result_parser.add_argument('unix_seconds', type=int, location='json',
                            help="Optionally supply timestamp in seconds since unix epoch")
-"""result_parser.add_argument('done', type=bool, required=True,
-                           help="Legacy support for multiple part problems. Supply false if"
-                                " the user must answer more parts, otherwise leave this true")"""
-
-""" Global lock for calling choose_next_problem """
-selector_lock = threading.Lock()
 
 
-def run_selector(course_id, user_id, selector, repo):
-    """
-    Run the problem selection sequence (in separate thread)
-
-    :param selector: SelectInterface
-    :param repo: DataInterface
-    """
-    with selector_lock:
-        logger.info("SELECTOR LOCK ACQUIRED!")
-        nex = None
-        try:
-            nex = repo.get_next_problem(course_id, user_id)
-        except DataException as e:
-            # exception here probably means the user/course combo doesn't exist. Screw it, quit
-            return
-
-        # only run if no next problem has been selected yet, or there was an error previously
-        if nex is None or 'error' in nex:
-            try:
-                logger.info("SELECTOR CHOOSING NEXT PROBLEM")
-                prob = selector.choose_next_problem(course_id, user_id)
-                logger.info("FINISHED CHOOSING NEXT PROBLEM: {}".format(str(prob)))
-                repo.set_next_problem(course_id, user_id, prob)
-            except SelectException as e:
-                # assume that the user/course exists. Set an error...
-                logger.exception("SELECTION EXCEPTION OCCURED:")
-                repo.set_next_problem(course_id, user_id, {'error': str(e)})
-
-            except DataException as e:
-                logger.exception("DATA EXCEPTION HAPPENED, OH NO!")
-                # TODO: after deciding if set_next_problem could throw an exception here
-
-        else:
-            logger.info("SELECTION NOT REQUIRED!")
-
-
-class UserInteraction(Resource):
+class UserInteraction(DefaultResource):
     """
     Post a user's response to their current problem.
-
-    :param repo: DataInterface
-    :param selector: SelectInterface
     """
-    def __init__(self, **kwargs):
-        self.repo = kwargs['data']
-        self.selector = kwargs['selector']
-
     def post(self, course_id, user_id):
         args = result_parser.parse_args()
-        if args['unix_seconds'] is None:
-            args['unix_seconds'] = int(time.time())
+        timestamp = args['unix_seconds'] or int(time.time())
 
         try:
             # If this is a response to the "next" problem, advance to it first before storing
             # (shouldn't happen if PageLoad messages are posted correctly, but we won't require that)
             nex = self.repo.get_next_problem(course_id, user_id)
-            if nex and 'error' not in nex and args['problem'] == nex.get('problem_name'):
-                self.repo.advance_problem(course_id, user_id)
-
-            #TODO: guard against answering other problems...?
-            #possibly outside the scope of this software
-
-            self.repo.post_interaction(course_id, args['problem'], user_id, args['correct'],
-                                       args['attempt'], args['unix_seconds'])
-
-            #is the user now done? if so hack in a call to psiturk+bo module TODO: do this only once
-            """
-            if user_id in self.repo.get_finished_users(course_id):
-                print "USER IS DONE! ONTO BAYESIAN OPTIMIZATION!"
-                psiturk_with_bo.set_next_users_parameters(self.repo, self.selector, course_id)
-            """
+            self._rotate_problem(nex, course_id, user_id, **args)
+            self.repo.post_interaction(course_id, args['problem'], user_id, args['correct'], args['attempt'], timestamp)
 
             # the user needs a new problem, start choosing one
-            try:
-                logger.info("STARTING SELECTOR!")
-                """t = threading.Thread(target=run_selector, args=(course_id, user_id, self.selector, self.repo))
-                t.start()
-                t.join()
-                #TODO: actually run in other thread """
-                run_selector(course_id, user_id, self.selector, self.repo)
-            except Exception as e:
-                logger.exception("EXCEPTION STARTING SELECTION THREAD:")
-                abort(500, message="Interaction successfully stored, but an error occurred starting "
-                                   "a problem selection thread: " + e.message)
-
+            self.run_selector(course_id, user_id)
+        except SelectException as e:
+            abort(500, message="Interaction successfully stored, but an error occurred starting "
+                               "a problem selection: " + e.message)
         except DataException as e:
             logger.exception("DATA EXCEPTION:")
             abort(500, message=e.message)
 
-        return {"success": True}, 200
+        return {"success": True}, 201
 
 load_parser = reqparse.RequestParser()
 load_parser.add_argument('problem', required=True, help="Must supply the name of the problem loaded", location='json')
@@ -210,27 +130,20 @@ load_parser.add_argument('unix_seconds', type=int, help="Optionally supply times
                          location='json')
 
 
-class UserPageLoad(Resource):
+class UserPageLoad(DefaultResource):
     """
     Post the time when a user loads a problem. Used to log time spent solving a problem.
-
-    :param repo: DataInterface
     """
-    def __init__(self, **kwargs):
-        self.repo = kwargs['data']
-
     def post(self, course_id, user_id):
         args = load_parser.parse_args()
-        if args['unix_seconds'] is None:
-            args['unix_seconds'] = int(time.time())
+        timestamp = args['unix_seconds'] or int(time.time())
 
         try:
-            self.repo.post_load(course_id, args['problem'], user_id, args['unix_seconds'])
+            self.repo.post_load(course_id, args['problem'], user_id, timestamp)
             nex = self.repo.get_next_problem(course_id, user_id)
-            if nex and 'error' not in nex and args['problem'] == nex.get('problem_name'):
-                self.repo.advance_problem(course_id, user_id)
+            self._rotate_problem(nex, course_id, user_id, **args)
         except DataException as e:
             logger.exception("DATA EXCEPTION:")
             abort(500, message=e.message)
 
-        return {"success": True}, 200
+        return {"success": True}, 201

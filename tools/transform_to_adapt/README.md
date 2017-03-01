@@ -1,6 +1,7 @@
-# Script to transform problem into adaptive capa problem.
+# Script to transform problem into adaptive capa problem
 
-Currently script supports transformation for two main problems: `Multiple Choice` and `Checkbox`.
+Currently script supports transformation for two main problems:
+`Multiple Choice` and `Checkbox`.
 For example Checkbox problem:
 
 ```xml
@@ -43,11 +44,14 @@ feedback = {
 
 # Answer checking function called when the user hits &quot;Check&quot;
 def vglcfn(e, ans):
-    # Here we load the dictionary that EdX creates from the return values of GetState() and GetGrade()
+    # Here we load the dictionary that EdX creates from the return
+    # values of GetState() and GetGrade()
     par = json.loads(ans);
-    # Then we pull out and parse the return value from GetGrade(). The value from GetState() is in par[&quot;state&quot;]
+    # Then we pull out and parse the return value from GetGrade(). The
+    # value from GetState() is in par[&quot;state&quot;]
     answer = json.loads(par[&quot;answer&quot;])
-    # In our case the boolean value named correct_answer is true if the student got the question right
+    # In our case the boolean value named correct_answer is true if
+    # the student got the question right
     return {
         'input_list': [
             { 'ok': answer['correct_answer'], 'msg': feedback[tuple(answer['inputs'])},
@@ -61,7 +65,8 @@ def vglcfn(e, ans):
   <div id="problem_text" text="$text_question"/>
   <iframe height="200" id="first" seamless="seamless" src="/static/js/textbox.html?user_id=$anonymous_student_id&amp;
   amp;div=problem_text&amp;amp;iframe=first&amp;amp;showlink=true" width="700"/>
-  <div answer="1" choice0="Answer1" choice1="Answer2" choice2="Answer3" choices="3" id="form1"/>
+  <div answer="1" choice0="Answer1" choice1="Answer2" choice2="Answer3"
+   choices="3" id="form1"/>
   <customresponse cfn="vglcfn">
     <jsinput get_statefn="getState" gradefn="getGrade" height="160" html_file="/static/js/generic_checkbox.html?
     user_id=$anonymous_student_id$div=form1" set_statefn="setState" width="700"/>
@@ -76,9 +81,12 @@ Script usage:
 ```bash
 > python transform_problems.py path/to/problem/xml/file/source path/to/output/dir [--regex 'string to search in file name']
 ```
-Where `--regex` is optional parameter with expect string to select matched files from source problem dirs.
+
+Where `--regex` is optional parameter with expect string to select
+matched files from source problem dirs.
 
 E.g. source directory has four problem files:
+
 ```text
 --problem
   |--section1-problem1.xml
@@ -86,4 +94,6 @@ E.g. source directory has four problem files:
   |--chap-info.xml
   |--data_info.xml
 ```
-with `--regex section` first two problem will be transformed, with `--regex _info` only last one.
+
+with `--regex section` first two problem will be transformed, with
+`--regex _info` only last one.
