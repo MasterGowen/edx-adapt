@@ -68,7 +68,12 @@ class ParametersBulk(Parameters):
         args = param_parser.parse_args()
         course = args['course_id']
         user = args['user_id']
-        default_param = None
+
+        try:
+            default_param = self.repo.get_model_params(course)
+        except DataException:
+            logger.debug("Default model's parameters are not found in the course description.")
+            default_param = None
 
         try:
             skills_list = self.repo.get_skills(course)
@@ -89,11 +94,15 @@ class ParametersBulk(Parameters):
             )
         try:
             key = self.create_search_key(course, user)
-            default_param = self.repo.get(key) or self.repo.get_model_params(course)
+            default_param = self.repo.get(key)
+            logger.debug(
+                "User has been already enrolled in the course, adapt will use already chosen parameters: {}".
+                format(default_param)
+            )
         except DataException:
             logger.debug(
-                "Default model's parameters are not found, adapt enrolls user with parameters: {}".format(
-                    args['params']
+                "User has not been enrolled in the course yet, adapt enrolls user with parameters: {}".format(
+                    default_param if default_param else args['params']
                 )
             )
             pass
